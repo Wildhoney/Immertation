@@ -1,8 +1,10 @@
 import * as immer from 'immer';
+import type { Patch } from 'immer';
 import type { Recipe, WithAnnotations } from './types';
-import { Node } from './types';
+import { Node, Annotation } from './types';
 import { encapsulate, augment, reconcile, distill, annotations } from './utils';
 import clone from 'lodash/cloneDeep';
+import { G } from '@mobily/ts-belt';
 
 immer.setAutoFreeze(false);
 
@@ -15,8 +17,9 @@ export default class Immeration<M> {
 
   produce(recipe: Recipe<M>): [M, WithAnnotations<M>] {
     const patches = augment(distill<M>(clone(this.#model)), recipe);
-    this.#model = reconcile(immer.applyPatches(this.#model, patches));
-    return [clone(distill<M>(this.#model)), annotations<M>(this.#model)];
+    const newModel = immer.applyPatches(this.#model, patches);
+    this.#model = reconcile(newModel);
+    return [distill<M>(this.#model), annotations<M>(this.#model)];
   }
 }
 

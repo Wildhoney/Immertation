@@ -34,6 +34,7 @@ immer.setAutoFreeze(false);
  */
 export function encapsulate<M>(model: M): Node {
   if (G.isNullable(model)) return new Node(model);
+  if (model instanceof Annotation) return new Node(model);
   if (G.isArray(model)) return new Node(A.map(model, (item) => encapsulate(item)));
   if (G.isObject(model)) return new Node(D.map(model, (value) => encapsulate(value)));
   return new Node(model);
@@ -65,13 +66,13 @@ export function encapsulate<M>(model: M): Node {
 export function augment<M>(model: M, recipe: Recipe<M>): Patch[] {
   const [, patches] = immer.produceWithPatches(model, recipe);
   const augmented = A.map(patches, (patch) => {
-    const path = A.reduce(patch.path, ['value'] as (string | number)[], (path, segment) => [
+    const path = A.reduce(patch.path, ['current'] as (string | number)[], (path, segment) => [
       ...path,
       segment,
-      'value',
+      'current',
     ]);
 
-    return { ...patch, path } as Patch;
+    return { ...patch, path, value: encapsulate(patch.value) } as Patch;
   });
 
   return augmented as Patch[];
@@ -108,28 +109,51 @@ export function reconcile(node: Node): Node {
     return node;
   }
 
-  if (node.value instanceof Annotation) {
+  if (node.current instanceof Node) {
+    const reconciled = reconcile(node.current);
+    if (node.annotation && reconciled.annotation) {
+      const merged = new Annotation(
+        node.annotation.value,
+        node.annotation.operations,
+        node.annotation.records[0].process
+      );
+      merged.merge(reconciled.annotation);
+      return new Node(reconciled.current, merged);
+    }
+    return new Node(reconciled.current, reconciled.annotation || node.annotation);
+  }
+
+  if (node.current instanceof Annotation) {
+    const value = node.current.value;
+    const encapsulatedValue = (G.isObject(value) && !(value instanceof Annotation)) || G.isArray(value)
+      ? encapsulate(value).current
+      : value;
+
     if (node.annotation instanceof Annotation) {
       const annotations = new Annotation(
-        node.value.value,
-        node.value.operations,
-        node.value.records[0].process
+        node.annotation.value,
+        node.annotation.operations,
+        node.annotation.records[0].process
       );
-      annotations.records = [...A.concat(node.annotation.records, node.value.records)];
-      return new Node(node.value.value, annotations);
+      annotations.merge(node.current);
+      return new Node(encapsulatedValue, annotations);
     }
 
-    return new Node(node.value.value, node.value);
+    return new Node(encapsulatedValue, node.current);
   }
 
-  if (G.isArray(node.value)) {
-    const reconciledArray = A.map(node.value, (item) => reconcile(item as Node)) as unknown[];
-    return new Node(reconciledArray, node.annotation);
+  if (G.isArray(node.current)) {
+    return new Node(
+      A.map(node.current, (value) => reconcile(value as Node)),
+      node.annotation
+    );
   }
 
-  if (G.isObject(node.value)) {
-    const reconciledObj = D.map(node.value, (val) => reconcile(val as Node));
-    return new Node(reconciledObj, node.annotation);
+  if (G.isObject(node.current) && !(node.current instanceof Annotation)) {
+    return new Node(
+      D.map(node.current, (value) => reconcile(value as Node)),
+      node.annotation
+    );
   }
 
   return node;
@@ -157,12 +181,25 @@ export function reconcile(node: Node): Node {
  * // Returns: { name: "John", age: 30 }
  * ```
  */
-export function distill<M>(node: Node): M {
-  if (!(node instanceof Node)) return node as M;
-  if (G.isNullable(node.value)) return node.value as M;
-  if (G.isArray(node.value)) return A.map(node.value, (item) => distill(item as Node)) as M;
-  if (G.isObject(node.value)) return D.map(node.value, (val) => distill(val as Node)) as M;
-  return node.value as M;
+export function distill<M>(node: Node | Annotation<M>): M {
+  if (node instanceof Annotation) {
+    return node.value;
+  }
+
+  if (!(node instanceof Node)) {
+    return node as M;
+  }
+
+  if (node.current instanceof Annotation) {
+    return node.current.value as M;
+  }
+
+  if (G.isNullable(node.current)) return node.current as M;
+  if (G.isArray(node.current)) return A.map(node.current, (item) => distill(item as Node)) as M;
+  if (G.isObject(node.current) && !(node.current instanceof Annotation)) {
+    return D.map(node.current, (val) => distill(val as Node)) as M;
+  }
+  return node.current as M;
 }
 
 export function annotations<M>(node: Node): WithAnnotations<M> {
@@ -209,6 +246,15 @@ export function annotations<M>(node: Node): WithAnnotations<M> {
           };
         }
 
+        if (property === 'draft') {
+          return () => {
+            if (!annotation) return undefined;
+            // Return the most recent value from the records array
+            const lastRecord = A.last(annotation.records);
+            return lastRecord ? lastRecord.value : undefined;
+          };
+        }
+
         if (children) {
           if (G.isArray(children) && typeof property === 'string') {
             const index = parseInt(property, 10);
@@ -229,13 +275,13 @@ export function annotations<M>(node: Node): WithAnnotations<M> {
     if (!(value instanceof Node)) return make(null);
     if (value.annotation) return make(value.annotation);
 
-    if (G.isArray(value.value)) {
-      const children = A.map(value.value, (item) => traverse(item)) as unknown[];
+    if (G.isArray(value.current)) {
+      const children = A.map(value.current, (item) => traverse(item)) as unknown[];
       return make(null, children);
     }
 
-    if (G.isObject(value.value)) {
-      const children = D.map(value.value, (item) => traverse(item));
+    if (G.isObject(value.current)) {
+      const children = D.map(value.current, (item) => traverse(item));
       return make(null, children);
     }
 

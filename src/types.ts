@@ -1,4 +1,5 @@
 import { immerable } from 'immer';
+import { A } from '@mobily/ts-belt';
 
 export type Recipe<M> = (draft: M) => void;
 
@@ -23,7 +24,7 @@ export class Node<T = unknown> {
   [immerable] = true;
 
   constructor(
-    public value: T,
+    public current: T,
     public annotation: Annotation<T> | null = null
   ) {}
 }
@@ -31,12 +32,22 @@ export class Node<T = unknown> {
 export class Annotation<T> {
   public records: AnnotationRecord<T>[];
 
-  constructor(
-    public value: T,
-    public operations: State[],
-    process: Process
-  ) {
+  constructor(value: T, operations: State[], process: Process) {
     this.records = [{ value, operations, process }];
+  }
+
+  get value(): T {
+    const lastRecord = A.last(this.records);
+    return lastRecord!.value;
+  }
+
+  get operations(): State[] {
+    const lastRecord = A.last(this.records);
+    return lastRecord!.operations;
+  }
+
+  merge(other: Annotation<T>): void {
+    this.records = [...A.concat(this.records, other.records)];
   }
 }
 
@@ -72,6 +83,7 @@ type IsPrimitive<T> = T extends string | number | boolean | null | undefined | s
 
 export interface AnnotationProxy {
   is(operation: unknown): boolean;
+  draft<T>(): T;
 }
 
 export type WithAnnotations<T> =
