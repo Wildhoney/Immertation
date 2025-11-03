@@ -1,4 +1,5 @@
 import { immerable, type Objectish, Immer, enablePatches } from 'immer';
+import * as immer from 'immer';
 import { A } from '@mobily/ts-belt';
 
 /**
@@ -39,6 +40,12 @@ export class Config {
    * The property name used to access the current value in Node instances.
    */
   static separator = 'current' as const;
+
+  /**
+   * Symbol used to mark items that should be filtered out during distillation.
+   * This is used instead of null/undefined to avoid conflicts with legitimate null/undefined values in the model.
+   */
+  static nil = Symbol('nil');
 
   /**
    * The Immer instance used for producing and applying patches.
@@ -282,7 +289,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Add<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Add], null, process) as T;
+    try {
+      return Annotation.create(immer.current(value) as T, [State.Add], null, process) as T;
+    } catch {
+      return Annotation.create(value, [State.Add], null, process) as T;
+    }
   }
 
   /**
@@ -294,7 +305,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Remove<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Remove], null, process) as T;
+    try {
+      return Annotation.create(immer.current(value) as T, [State.Remove], null, process) as T;
+    } catch {
+      return Annotation.create(value, [State.Remove], null, process) as T;
+    }
   }
 
   /**
@@ -306,7 +321,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Update<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Update], null, process) as T;
+    try {
+      return Annotation.create(immer.current(value) as T, [State.Update], null, process) as T;
+    } catch {
+      return Annotation.create(value, [State.Update], null, process) as T;
+    }
   }
 
   /**
@@ -318,7 +337,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Move<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Move], null, process) as T;
+    try {
+      return Annotation.create(immer.current(value) as T, [State.Move], null, process) as T;
+    } catch {
+      return Annotation.create(value, [State.Move], null, process) as T;
+    }
   }
 
   /**
@@ -330,7 +353,16 @@ export class Operation {
    * @returns The annotated value
    */
   static Replace<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Update, State.Replace], null, process) as T;
+    try {
+      return Annotation.create(
+        immer.current(value) as T,
+        [State.Update, State.Replace],
+        null,
+        process
+      ) as T;
+    } catch {
+      return Annotation.create(value, [State.Update, State.Replace], null, process) as T;
+    }
   }
 
   /**
@@ -342,7 +374,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Sort<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Sort], null, process) as T;
+    try {
+      return Annotation.create(immer.current(value) as T, [State.Sort], null, process) as T;
+    } catch {
+      return Annotation.create(value, [State.Sort], null, process) as T;
+    }
   }
 }
 

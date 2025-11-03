@@ -1,6 +1,7 @@
 import type { Recipe, Tree, Path, Process, Slice, Operations } from './types';
 import { Node, Annotation, Operation, State, Revision, Config } from './types';
 import type { Objectish, Patch } from 'immer';
+import * as immer from 'immer';
 import { A, D, G } from '@mobily/ts-belt';
 import clone from 'lodash/cloneDeep';
 import get from 'lodash/get';
@@ -36,10 +37,7 @@ export function extend<M>(node: Tree<M>): M {
     get(_, prop) {
       if (prop === 'get') {
         return (revision: Revision = Revision.Current) => {
-          const hasAnnotation = node.annotation.records.length > 0;
-          return revision === Revision.Draft && hasAnnotation
-            ? node.annotation.draft
-            : node[Config.separator];
+          return distill(node, revision);
         };
       }
       if (prop === 'is') {
@@ -81,6 +79,81 @@ export function encapsulate<M>(model: M): Tree<M> {
   if (G.isArray(model)) return new Node(A.map(model, (value) => encapsulate(value))) as Tree<M>;
   if (G.isObject(model)) return new Node(D.map(model, (value) => encapsulate(value))) as Tree<M>;
   return new Node(model) as Tree<M>;
+}
+
+/**
+ * Recursively unwraps a Tree structure back to a plain model.
+ *
+ * This function extracts values from the Node structure based on the specified revision,
+ * removing all annotations and returning a plain JavaScript object/array/primitive.
+ *
+ * @template M - The type of the model
+ * @param node - The encapsulated Node structure to unwrap
+ * @param revision - The revision to extract (Current or Draft)
+ * @returns A plain model with values from the specified revision
+ *
+ * @example
+ * ```typescript
+ * const encapsulated = encapsulate({ name: "John", age: 30 });
+ * const plain = distill(encapsulated, Revision.Current);
+ * // Returns: { name: "John", age: 30 }
+ * ```
+ */
+export function distill<M>(node: Tree<M>, revision: Revision = Revision.Current): M {
+  const current = node[Config.separator];
+  const hasAnnotation = node.annotation.records.length > 0;
+
+  if (G.isNullable(current)) {
+    if (hasAnnotation && revision === Revision.Draft) return node.annotation.draft as M;
+    return current as M;
+  }
+
+  if (current instanceof Annotation) {
+    return revision === Revision.Draft ? (current.draft as M) : (undefined as M);
+  }
+
+  if (G.isArray(current)) {
+    const items = A.map(current, (item) => {
+      if (item instanceof Annotation) {
+        const adding = A.some(item.operations, (operation) => operation === State.Add);
+        const removing = A.some(item.operations, (operation) => operation === State.Remove);
+
+        return revision === Revision.Draft
+          ? removing
+            ? Config.nil
+            : item.draft
+          : adding
+            ? Config.nil
+            : item.draft;
+      }
+      if (item instanceof Node) return distill(item as Tree<unknown>, revision);
+      return item;
+    });
+    return A.filter(items, (item) => item !== Config.nil) as M;
+  }
+
+  if (G.isObject(current)) {
+    const items = D.map(current, (item) => {
+      if (item instanceof Annotation) {
+        const adding = A.some(item.operations, (operation) => operation === State.Add);
+        const removing = A.some(item.operations, (operation) => operation === State.Remove);
+
+        return revision === Revision.Draft
+          ? removing
+            ? Config.nil
+            : item.draft
+          : adding
+            ? Config.nil
+            : item.draft;
+      }
+      if (item instanceof Node) return distill(item as Tree<unknown>, revision);
+      return item;
+    });
+    return D.filter(items, (value) => value !== Config.nil) as M;
+  }
+
+  if (hasAnnotation && revision === Revision.Draft) return node.annotation.draft as M;
+  return current as M;
 }
 
 /**
@@ -134,12 +207,26 @@ export function prune<M>(node: Tree<M>, process: Process): Tree<M> {
 }
 
 /**
+ * Converts an Immer draft to a plain value, or returns the value as-is if not a draft.
+ *
+ * @param value - The value to convert
+ * @returns The plain value
+ */
+function plain<T>(value: T): T {
+  try {
+    return immer.current(value) as T;
+  } catch {
+    return value;
+  }
+}
+
+/**
  * Transforms Immer patches to work with the Node-based structure by augmenting paths.
  *
- * This function applies a recipe to produce Immer patches, then modifies each patch path
- * to account for the nested Node structure. Since each value in the encapsulated model
- * is wrapped in a Node with a 'current' property (defined by separator), the patch paths
- * need to be augmented to include the separator at each level of nesting.
+ * This function applies a recipe to a plain model (distilled from the Tree), produces Immer patches,
+ * then modifies each patch path to account for the nested Node structure. Since each value in the
+ * encapsulated model is wrapped in a Node with a 'current' property (defined by separator), the patch
+ * paths need to be augmented to include the separator at each level of nesting.
  *
  * For each patch containing an Annotation, it creates a slice (snapshot) of the model
  * at that point in the patch sequence, allowing the annotation to reference the state
@@ -147,35 +234,39 @@ export function prune<M>(node: Tree<M>, process: Process): Tree<M> {
  *
  * @template M - The type of the model
  * @param model - The encapsulated model to apply the recipe to
- * @param recipe - The function that describes the changes to make
+ * @param recipe - The function that describes the changes to make (receives a plain model)
  * @returns An array of augmented patches that can be applied to the Node structure
  *
  * @example
  * ```typescript
  * const encapsulated = encapsulate({ name: "John", age: 30 });
  * const patches = augment(encapsulated, (draft) => {
- *   draft.name = "Jane";
+ *   draft.name = "Jane"; // draft is a plain object, not wrapped in Nodes
  * });
  * // Returns patches with paths like ['current', 'name', 'current']
  * // instead of just ['name']
  * ```
  */
 export function augment<M extends Objectish>(model: Tree<M>, recipe: Recipe<M>): Patch[] {
-  const [, patches] = Config.immer.produceWithPatches(model, recipe);
+  const [, patches] = Config.immer.produceWithPatches(distill(model), recipe);
 
   const augmented = A.mapWithIndex(patches, (index, patch) => {
     const path = pathify(patch.path as (string | number)[]);
     const cloned = clone(model);
 
-    const slice = <Tree<M>>get(Config.immer.applyPatches(cloned, A.take(patches, index)), path);
+    const slice = <Tree<M> | undefined>(
+      get(Config.immer.applyPatches(cloned, A.take(patches, index)), path)
+    );
 
     return {
       ...patch,
       path,
       value:
         patch.value instanceof Annotation
-          ? new Node(slice.current, Annotation.merge(slice.annotation, patch.value))
-          : new Node(patch.value),
+          ? G.isNullable(slice)
+            ? new Node(Config.nil, patch.value)
+            : new Node(slice.current, Annotation.merge(slice.annotation, patch.value))
+          : new Node(plain(patch.value)),
     } as Patch;
   });
 

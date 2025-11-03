@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { faker } from '@faker-js/faker';
-import { augment, encapsulate } from './utils';
+import { augment, encapsulate, distill } from './utils';
 import { Operation, Config } from './types';
 
 type Model = {
@@ -21,6 +21,33 @@ describe('encapsulate()', () => {
 
     expect(model[Config.separator].age[Config.separator]).toEqual(age);
     expect(model[Config.separator].age.annotation).toBeTruthy();
+  });
+});
+
+describe('distill()', () => {
+  it('should distill encapsulated models to plain objects', () => {
+    const plain = distill<Model>(model);
+
+    expect(plain).toEqual({ name, age });
+    expect(plain.name).toEqual(name);
+    expect(plain.age).toEqual(age);
+  });
+
+  it('should distill nested structures', () => {
+    type Model = {
+      user: { name: string; age: number };
+      tags: string[];
+    };
+    const nested: Model = {
+      user: { name: faker.person.firstName(), age: faker.number.int(100) },
+      tags: ['admin', 'user'],
+    };
+    const encapsulated = encapsulate(nested);
+    const plain = distill<Model>(encapsulated);
+
+    expect(plain).toEqual(nested);
+    expect(plain.user.name).toEqual(nested.user.name);
+    expect(plain.tags).toEqual(nested.tags);
   });
 });
 
