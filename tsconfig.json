@@ -14,13 +14,20 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "immeration": ["./src/index.ts"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": ["src", "example"]
 }

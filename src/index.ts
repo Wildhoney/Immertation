@@ -1,66 +1,86 @@
 import type { Objectish } from 'immer';
-import type { Recipe, Tree, Extended, Process } from './types';
-import { encapsulate, augment, extend, prune } from './utils';
-import { Config } from './types';
+import type { Tree, Recipe, Process } from './types';
+import { encapsulate } from './utils';
+import clone from 'lodash/cloneDeep';
 
 /**
- * Main class for managing immutable state with operation tracking.
+ * Store type that includes model properties as Nodes.
+ */
+export type StoreWithModel<M extends Objectish> = {
+  [K in keyof M]: Tree<M[K]>;
+} & {
+  read(): M;
+  mutate(recipe: Recipe<M>): void;
+  prune(process: Process): M;
+};
+
+/**
+ * Store class for managing immutable state with operation tracking.
  *
  * @template M - The model type to manage
- *
- * @example
- * ```typescript
- * type Model = { name: string; age: number };
- * const store = new Immeration<Model>({ name: 'John', age: 30 });
- *
- * const model = store.mutate((draft) => {
- *   draft.name = 'Jane';
- * });
- *
- * console.log(model.name.get()); // 'Jane'
- * ```
  */
-export class Immeration<M extends Objectish> {
+export const Store: {
+  new <M extends Objectish>(model: M): StoreWithModel<M>;
+} = class Store<M extends Objectish> {
   #model: Tree<M>;
 
   /**
-   * Creates a new Immeration instance.
+   * Creates a new Store instance.
    *
    * @param model - The initial model state
    */
   constructor(model: M) {
-    this.#model = encapsulate(model);
+    this.#model = encapsulate(clone(model));
+
+    // Create getters for each property of the model
+    const wrappedModel = this.#model.get(0 as any) as never;
+    if (wrappedModel && typeof wrappedModel === 'object') {
+      Object.keys(wrappedModel).forEach((key) => {
+        Object.defineProperty(this, key, {
+          get() {
+            return wrappedModel[key];
+          },
+          enumerable: true,
+          configurable: true,
+        });
+      });
+    }
   }
 
   /**
-   * Applies mutations to the model and returns an extended proxy.
+   * Returns the current state of the model.
+   *
+   * @returns The current model state
+   */
+  read(): any {
+    // TODO: Implement read method
+    return this.#model;
+  }
+
+  /**
+   * Applies mutations to the model.
    *
    * @param recipe - A function that mutates a draft of the model
-   * @returns An extended model with get and is methods on all properties
    *
    * @example
    * ```typescript
    * const process = Symbol('update');
-   * const model = store.mutate((draft) => {
+   * store.mutate((draft) => {
    *   draft.name = Operation.Update('Jane', process);
    * });
-   *
-   * console.log(model.name.get(Revision.Current)); // 'John'
-   * console.log(model.name.get(Revision.Draft));   // 'Jane'
-   * console.log(model.name.is(Operation.Update));  // true
    * ```
    */
-  mutate(recipe: Recipe<M>): Extended<M> {
-    const patches = augment<M>(this.#model, recipe);
-    this.#model = Config.immer.applyPatches(this.#model, patches);
-    return extend(this.#model) as unknown as Extended<M>;
+  mutate(_recipe: Recipe<M>): void {
+    // TODO: Implement mutate method
+    // const patches = augment<M>(this.#model, recipe);
+    // this.#model = Config.immer.applyPatches(this.#model, patches);
   }
 
   /**
    * Removes all operation records associated with a specific process.
    *
    * @param process - The process identifier to remove
-   * @returns An extended model with the process records removed
+   * @returns The model state with the process records removed
    *
    * @example
    * ```typescript
@@ -69,14 +89,14 @@ export class Immeration<M extends Objectish> {
    *   draft.name = Operation.Update('Alice', process1);
    * });
    *
-   * const model = store.prune(process1);
-   * console.log(model.name.is(Operation.Update)); // false
+   * store.prune(process1);
    * ```
    */
-  prune(process: Process): Extended<M> {
-    this.#model = prune(this.#model, process);
-    return extend(this.#model) as unknown as Extended<M>;
+  prune(_process: Process): M {
+    // TODO: Implement prune method
+    // this.#model = prune(this.#model, process);
+    return this.#model as never;
   }
-}
+} as never;
 
-export { Operation, Revision } from './types';
+export { Revision } from './types';

@@ -1,4 +1,4 @@
-.PHONY: fmt lint typecheck unit build
+.PHONY: fmt lint typecheck unit build checks start
 
 fmt:
 	npm run fmt
@@ -14,3 +14,8 @@ unit:
 
 build:
 	npm run build
+
+start:
+	npm run dev
+
+checks: fmt lint typecheck unit

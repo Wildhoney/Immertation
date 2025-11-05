@@ -1,62 +1,4 @@
-import { immerable, type Objectish, Immer, enablePatches } from 'immer';
-import * as immer from 'immer';
-import { A } from '@mobily/ts-belt';
-
-/**
- * Exception types for Immertation errors.
- */
-export enum Exception {
-  /**
-   * Thrown when attempting to access or modify an annotation with no records.
-   */
-  EmptyAnnotations,
-}
-
-/**
- * Custom error class for Immertation-specific exceptions.
- *
- * @example
- * ```typescript
- * throw new ImmertationError(Exception.EmptyAnnotations);
- * ```
- */
-export class ImmertationError extends Error {
-  /**
-   * Creates a new ImmertationError.
-   *
-   * @param type - The exception type
-   */
-  constructor(public type: Exception) {
-    super();
-    this.name = 'ImmertationError';
-  }
-}
-
-/**
- * Configuration for the Immertation system.
- */
-export class Config {
-  /**
-   * The property name used to access the current value in Node instances.
-   */
-  static separator = 'current' as const;
-
-  /**
-   * Symbol used to mark items that should be filtered out during distillation.
-   * This is used instead of null/undefined to avoid conflicts with legitimate null/undefined values in the model.
-   */
-  static nil = Symbol('nil');
-
-  /**
-   * The Immer instance used for producing and applying patches.
-   */
-  static immer = (() => {
-    const immer = new Immer();
-    enablePatches();
-    immer.setAutoFreeze(false);
-    return immer;
-  })();
-}
+import { A, G, D } from '@mobily/ts-belt';
 
 /**
  * A function that mutates a draft of the model.
@@ -69,6 +11,11 @@ export type Recipe<M> = (draft: M) => void;
  * A unique identifier for a mutation process.
  */
 export type Process = symbol;
+
+/**
+ * A slice of the model state.
+ */
+export type Slice = any;
 
 /**
  * Operation states that can be applied to values.
@@ -89,6 +36,69 @@ export enum State {
 }
 
 /**
+ * Error exceptions for Immertation operations.
+ */
+export enum Exception {
+  EmptyAnnotations = 'EmptyAnnotations',
+}
+
+/**
+ * Custom error class for Immertation errors.
+ */
+export class ImmertationError extends Error {
+  constructor(exception: Exception) {
+    super(exception);
+    this.name = 'ImmertationError';
+  }
+}
+
+/**
+ * A record of a change operation in an annotation.
+ */
+export type AnnotationRecord<T, S> = {
+  value: T;
+  operations: State[];
+  slice: S | null;
+  process: Process;
+};
+
+/**
+ * A record stored in a Node to track changes.
+ */
+export type Annotation<T> = {
+  value: T;
+  state: State;
+  process: Process;
+};
+
+/**
+ * Recursive tree type that wraps all values in Nodes.
+ *
+ * @template T - The base type to convert to a tree
+ */
+export type Tree<T> = T extends null | undefined
+  ? Node<T>
+  : T extends (infer U)[]
+    ? Node<Tree<U>[]>
+    : T extends object
+      ? Node<{ [K in keyof T]: Tree<T[K]> }> & { [K in keyof T]: Tree<T[K]> }
+      : Node<T>;
+
+/**
+ * Unwraps a Tree type to get the original plain type.
+ *
+ * @template T - The Tree type to unwrap
+ */
+export type Value<T> =
+  T extends Node<infer U>
+    ? Value<U>
+    : T extends (infer U)[]
+      ? Value<U>[]
+      : T extends object
+        ? { [K in keyof T]: Value<T[K]> }
+        : T;
+
+/**
  * Revision types for accessing values.
  */
 export enum Revision {
@@ -99,325 +109,135 @@ export enum Revision {
 }
 
 /**
- * A snapshot of the model state.
- */
-export type Slice = Objectish;
-
-/**
- * A record of a value change with associated metadata.
+ * Base class for wrapping values in the tree structure.
+ * Nodes enable tracking and annotation of changes at any level of the data structure.
  *
- * @template T - The value type
- * @template S - The slice type
+ * @template T - The type of value being wrapped
  */
-export type Record<T, S extends Slice> = {
-  /** The value at this point */
-  value: T;
-  /** The operations applied */
-  operations: State[];
-  /** The process that created this record */
-  process: Process;
-  /** A snapshot of the model at this point */
-  slice: null | S;
-};
+export class Node<T> {
+  #value: T;
+  #annotations: Annotation<T>[] = [];
 
-/**
- * A path segment for navigating nested structures.
- */
-export type Path = string | number | symbol;
+  constructor(value: T) {
+    this.#value = value;
 
-/**
- * A node in the encapsulated tree structure.
- *
- * Wraps values with annotations to track changes.
- *
- * @template T - The value type
- * @template S - The slice type
- */
-export class Node<T = unknown, S extends Slice = Slice> {
-  [immerable] = true;
-  declare [Config.separator]: T;
+    // Create getters for object properties
+    if (!G.isNullable(value) && G.isObject(value) && !G.isArray(value)) {
+      Object.keys(value as any).forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(this, key)) {
+          const getValue = () => this.#value;
+          const getAnnotations = () => this.#annotations;
+          Object.defineProperty(this, key, {
+            get() {
+              const currentNode = (getValue() as any)[key];
+              const annotation = A.head(getAnnotations());
+
+              if (annotation && currentNode instanceof Node) {
+                // If there's an annotation on the parent, the nested node should get an annotation too
+                const draftValue = (annotation.value as any)[key];
+                if (draftValue instanceof Node) {
+                  // Add an annotation to the current node with the draft node's value
+                  const draftPrimitiveValue = draftValue.get(0 as any);
+                  (currentNode as any).#annotations = [
+                    {
+                      value: draftPrimitiveValue,
+                      state: annotation.state,
+                      process: annotation.process,
+                    },
+                  ];
+                }
+              }
+
+              return currentNode;
+            },
+            enumerable: true,
+            configurable: true,
+          });
+        }
+      });
+    }
+  }
 
   /**
-   * Creates a new Node.
+   * Gets the wrapped value.
    *
-   * @param current - The current value
-   * @param annotation - The annotation containing change records
+   * @param revision - The revision to retrieve (Current or Draft)
+   * @returns The wrapped value
    */
-  constructor(
-    current: T,
-    public annotation: Annotation<T, S> = Annotation.empty<T, S>()
-  ) {
-    this[Config.separator] = current;
+  get(revision: Revision): T {
+    if (revision === Revision.Current) return this.#value;
+    const annotation = A.head(this.#annotations);
+    if (annotation) return annotation.value as T;
+    return this.#value;
+  }
+
+  /**
+   * Sets the value of this node.
+   *
+   * @param value - The new value to set
+   * @param states - Optional state flags for the update
+   */
+  set(value: Value<T>, states?: State | number): void {
+    // For object nodes, encapsulate the value. For primitive nodes, use as-is
+    const wrappedValue =
+      G.isObject(this.#value) && !G.isArray(this.#value) && !G.isNullable(this.#value)
+        ? D.map(value as Record<string, unknown>, (v) => this.#encapsulate(v))
+        : value;
+
+    if (!G.isNullable(states)) {
+      // Add annotation to this node
+      this.#annotations = [
+        {
+          value: wrappedValue as T,
+          state: states,
+          process: Symbol('update'), // TODO: Pass process from somewhere
+        },
+        ...this.#annotations,
+      ];
+    } else {
+      // Replace the value directly
+      this.#value = wrappedValue as T;
+    }
+  }
+
+  /**
+   * Wraps a value in Nodes. Similar to the encapsulate function in utils.
+   * @private
+   */
+  #encapsulate(value: unknown): unknown {
+    if (G.isNullable(value)) return new NodeP(value);
+    if (G.isArray(value)) return new NodeA(A.map(value, (v) => this.#encapsulate(v)));
+    if (G.isObject(value)) return new NodeO(D.map(value, (v) => this.#encapsulate(v)));
+    return new NodeP(value);
+  }
+
+  /**
+   * Checks if this node has pending changes (annotations).
+   *
+   * @returns True if there are annotations, false otherwise
+   */
+  pending(): boolean {
+    return A.isNotEmpty(this.#annotations);
   }
 }
 
 /**
- * Tracks changes to a value through a series of records.
+ * Node wrapper for primitive values (strings, numbers, booleans, null, undefined).
  *
- * @template T - The value type
- * @template S - The slice type
+ * @template T - The primitive type being wrapped
  */
-export class Annotation<T, S extends Slice> {
-  /** The list of change records */
-  public records: Record<T, S>[] = [];
-
-  /**
-   * Creates an empty annotation with no records.
-   *
-   * @template T - The value type
-   * @template S - The slice type
-   * @returns An empty annotation
-   */
-  static empty<T, S extends Slice>() {
-    return new Annotation<T, S>();
-  }
-
-  /**
-   * Creates an annotation with a single record.
-   *
-   * @template T - The value type
-   * @template S - The slice type
-   * @param value - The value
-   * @param operations - The operations applied
-   * @param slice - Optional snapshot of the model
-   * @param process - The process identifier
-   * @returns A new annotation with the record
-   */
-  static create<T, S extends Slice>(value: T, operations: State[], slice = null, process: Process) {
-    const annotation = new Annotation<T, S>();
-    annotation.records = [{ value, operations, slice, process }];
-    return annotation;
-  }
-
-  /**
-   * Merges two annotations by concatenating their records.
-   *
-   * @template T - The value type
-   * @template S - The slice type
-   * @param a - First annotation
-   * @param b - Second annotation
-   * @returns A new annotation with combined records
-   */
-  static merge<T, S extends Slice>(a: Annotation<T, S>, b: Annotation<T, S>): Annotation<T, S> {
-    const annotation = new Annotation<T, S>();
-    annotation.records = [...A.concat(a.records, b.records)];
-    return annotation;
-  }
-
-  /**
-   * Inserts a slice into the first record of an annotation.
-   *
-   * @template T - The value type
-   * @template S - The slice type
-   * @param annotation - The annotation to modify
-   * @param slice - The slice to insert
-   * @returns A new annotation with the slice inserted
-   * @throws {ImmertationError} If the annotation has no records
-   */
-  static insert<T, S extends Slice>({ records }: Annotation<T, S>, slice: S): Annotation<T, S> {
-    if (A.isEmpty(records)) throw new ImmertationError(Exception.EmptyAnnotations);
-    const annotation = new Annotation<T, S>();
-    annotation.records = [{ ...records[0], slice }, ...records.slice(1)];
-    return annotation;
-  }
-
-  /**
-   * Gets the draft value from the last record.
-   *
-   * @returns The draft value
-   * @throws {ImmertationError} If there are no records
-   */
-  get draft(): T {
-    const record = A.last(this.records);
-    if (!record) throw new ImmertationError(Exception.EmptyAnnotations);
-    return record.value;
-  }
-
-  /**
-   * Gets the operations from the last record.
-   *
-   * @returns The operations array, or empty array if no records
-   */
-  get operations(): State[] {
-    const record = A.last(this.records);
-    if (!record) {
-      return [];
-    }
-    return record.operations;
-  }
-
-  /**
-   * Gets the value from the last record.
-   *
-   * @returns The value
-   * @throws {ImmertationError} If there are no records
-   */
-  get value(): T {
-    const record = A.last(this.records);
-    if (!record) throw new ImmertationError(Exception.EmptyAnnotations);
-    return record.value;
-  }
-}
+export class NodeP<T> extends Node<T> {}
 
 /**
- * Union type of all operation types.
+ * Node wrapper for object values.
+ *
+ * @template T - The object type being wrapped
  */
-export type Operations =
-  | typeof Operation.Add
-  | typeof Operation.Remove
-  | typeof Operation.Update
-  | typeof Operation.Move
-  | typeof Operation.Replace
-  | typeof Operation.Sort;
+export class NodeO<T> extends Node<T> {}
 
 /**
- * Factory for creating annotated values with operation markers.
+ * Node wrapper for array values.
  *
- * @example
- * ```typescript
- * const process = Symbol('update');
- * draft.name = Operation.Update('Jane', process);
- * ```
+ * @template T - The array type being wrapped
  */
-export class Operation {
-  /**
-   * Marks a value as added.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Add<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(immer.current(value) as T, [State.Add], null, process) as T;
-    } catch {
-      return Annotation.create(value, [State.Add], null, process) as T;
-    }
-  }
-
-  /**
-   * Marks a value as removed.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Remove<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(immer.current(value) as T, [State.Remove], null, process) as T;
-    } catch {
-      return Annotation.create(value, [State.Remove], null, process) as T;
-    }
-  }
-
-  /**
-   * Marks a value as updated.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Update<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(immer.current(value) as T, [State.Update], null, process) as T;
-    } catch {
-      return Annotation.create(value, [State.Update], null, process) as T;
-    }
-  }
-
-  /**
-   * Marks a value as moved.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Move<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(immer.current(value) as T, [State.Move], null, process) as T;
-    } catch {
-      return Annotation.create(value, [State.Move], null, process) as T;
-    }
-  }
-
-  /**
-   * Marks a value as replaced (combines Update and Replace states).
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Replace<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(
-        immer.current(value) as T,
-        [State.Update, State.Replace],
-        null,
-        process
-      ) as T;
-    } catch {
-      return Annotation.create(value, [State.Update, State.Replace], null, process) as T;
-    }
-  }
-
-  /**
-   * Marks a value as sorted.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Sort<T>(value: T, process: Process): T {
-    try {
-      return Annotation.create(immer.current(value) as T, [State.Sort], null, process) as T;
-    } catch {
-      return Annotation.create(value, [State.Sort], null, process) as T;
-    }
-  }
-}
-
-/**
- * Internal type for proxied values with get and is methods.
- *
- * @internal
- */
-type Item<T> = {
-  get: (revision?: Revision) => T;
-  is: (operation: Operations) => boolean;
-} & (T extends (infer U)[]
-  ? { [K in keyof T]: Item<U> }
-  : T extends object
-    ? { [K in keyof T]: Item<T[K]> }
-    : Record<string, never>);
-
-/**
- * Extended type that provides get and is methods on all properties.
- *
- * @template T - The base type to extend
- */
-export type Extended<T> = T extends (infer U)[]
-  ? { [K in keyof T]: Item<U> }
-  : T extends object
-    ? { [K in keyof T]: Item<T[K]> }
-    : never;
-
-/**
- * Recursive tree type that wraps all values in Nodes.
- *
- * @template T - The base type to convert to a tree
- */
-export type Tree<T> = T extends null | undefined
-  ? Node<T>
-  : T extends Annotation<infer U, infer S>
-    ? Node<Annotation<U, S>>
-    : T extends (infer U)[]
-      ? Node<Tree<U>[]>
-      : T extends object
-        ? Node<{ [K in keyof T]: Tree<T[K]> }>
-        : Node<T>;
+export class NodeA<T> extends Node<T> {}
