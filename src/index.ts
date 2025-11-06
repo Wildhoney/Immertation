@@ -1,102 +1,67 @@
 import type { Objectish } from 'immer';
-import type { Tree, Recipe, Process } from './types';
-import { encapsulate } from './utils';
-import clone from 'lodash/cloneDeep';
+import type { Recipe, Extended, Annotated } from './types';
+import { apply, annotate } from './utils';
+// import clone from 'lodash/cloneDeep';
 
 /**
- * Store type that includes model properties as Nodes.
- */
-export type StoreWithModel<M extends Objectish> = {
-  [K in keyof M]: Tree<M[K]>;
-} & {
-  read(): M;
-  mutate(recipe: Recipe<M>): void;
-  prune(process: Process): M;
-};
-
-/**
- * Store class for managing immutable state with operation tracking.
+ * Main class for managing immutable state with operation tracking.
  *
  * @template M - The model type to manage
+ *
+ * @example
+ * ```typescript
+ * type Model = { name: string; age: number };
+ * const store = new Immeration<Model>({ name: 'John', age: 30 });
+ *
+ * const model = store.mutate((draft) => {
+ *   draft.name = 'Jane';
+ * });
+ *
+ * console.log(model.name.get()); // 'Jane'
+ * ```
  */
-export const Store: {
-  new <M extends Objectish>(model: M): StoreWithModel<M>;
-} = class Store<M extends Objectish> {
-  #model: Tree<M>;
+export class Immeration<M extends Objectish> {
+  #model: M;
+  #annotations: Annotated<M>;
 
   /**
-   * Creates a new Store instance.
+   * Creates a new Immeration instance.
    *
    * @param model - The initial model state
    */
   constructor(model: M) {
-    this.#model = encapsulate(clone(model));
-
-    // Create getters for each property of the model
-    const wrappedModel = this.#model.get(0 as any) as never;
-    if (wrappedModel && typeof wrappedModel === 'object') {
-      Object.keys(wrappedModel).forEach((key) => {
-        Object.defineProperty(this, key, {
-          get() {
-            return wrappedModel[key];
-          },
-          enumerable: true,
-          configurable: true,
-        });
-      });
-    }
+    this.#model = model;
+    this.#annotations = annotate(model);
   }
 
   /**
-   * Returns the current state of the model.
-   *
-   * @returns The current model state
-   */
-  read(): any {
-    // TODO: Implement read method
-    return this.#model;
-  }
-
-  /**
-   * Applies mutations to the model.
+   * Applies mutations to the model and returns an extended proxy.
    *
    * @param recipe - A function that mutates a draft of the model
+   * @returns An extended model with get and is methods on all properties
    *
    * @example
    * ```typescript
    * const process = Symbol('update');
-   * store.mutate((draft) => {
+   * const model = store.mutate((draft) => {
    *   draft.name = Operation.Update('Jane', process);
    * });
+   *
+   * console.log(model.name.get(Revision.Current)); // 'John'
+   * console.log(model.name.get(Revision.Draft));   // 'Jane'
+   * console.log(model.name.is(Operation.Update));  // true
    * ```
    */
-  mutate(_recipe: Recipe<M>): void {
-    // TODO: Implement mutate method
-    // const patches = augment<M>(this.#model, recipe);
-    // this.#model = Config.immer.applyPatches(this.#model, patches);
+  mutate(recipe: Recipe<M>): Extended<M> {
+    const [draft, annotations] = apply<M>(this.#model, this.#annotations, recipe);
+    this.#model = draft;
+    this.#annotations = annotations;
+    return draft as unknown as Extended<M>;
   }
 
-  /**
-   * Removes all operation records associated with a specific process.
-   *
-   * @param process - The process identifier to remove
-   * @returns The model state with the process records removed
-   *
-   * @example
-   * ```typescript
-   * const process1 = Symbol('process1');
-   * store.mutate((draft) => {
-   *   draft.name = Operation.Update('Alice', process1);
-   * });
-   *
-   * store.prune(process1);
-   * ```
-   */
-  prune(_process: Process): M {
-    // TODO: Implement prune method
-    // this.#model = prune(this.#model, process);
-    return this.#model as never;
+  get annotation() {
+    return this.#annotations;
   }
-} as never;
+}
 
-export { Revision } from './types';
+export { Operation, Revision } from './types';

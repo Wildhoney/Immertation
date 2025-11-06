@@ -1,24 +1,24 @@
 import { useMemo, useState } from 'react';
-import { Immeration, Revision } from 'immeration';
+import { Immeration, Revision, Operation } from 'immeration';
 import { model } from './utils';
 import { faker } from '@faker-js/faker';
 
 export default function People() {
   const store = useMemo(() => new Immeration(model), []);
-  const [state, setState] = useState(() => store.read());
+  const [state, setState] = useState(() => store.mutate(() => {}));
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const handleDelete = async (id: symbol) => {
     const process = Symbol('delete');
 
-    store.mutate((draft) => {
+    const updated = store.mutate((draft) => {
       const index = draft.people.findIndex((p) => p.id === id);
       if (index !== -1) {
         draft.people[index] = Operation.Remove(draft.people[index], process);
       }
     });
 
-    setState(store.read());
+    setState(updated);
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
@@ -26,21 +26,21 @@ export default function People() {
       draft.people = draft.people.filter((p) => p.id !== id);
     });
 
-    const prunedState = store.prune(process);
-    setState(prunedState);
+    // const prunedState = store.prune(process);
+    // setState(prunedState);
   };
 
   const handleSort = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
 
-    store.mutate((draft) => {
+    const updated = store.mutate((draft) => {
       draft.people.sort((a, b) => {
         return newOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       });
     });
 
     setSortOrder(newOrder);
-    setState(store.read());
+    setState(updated);
   };
 
   const handleRefresh = async (id: symbol) => {
@@ -49,7 +49,7 @@ export default function People() {
     const newName = faker.person.fullName();
     const newAge = faker.number.int({ min: 18, max: 80 });
 
-    store.mutate((draft) => {
+    const updated = store.mutate((draft) => {
       const index = draft.people.findIndex((p) => p.id === id);
       if (index !== -1) {
         draft.people[index] = Operation.Update(
@@ -59,7 +59,7 @@ export default function People() {
       }
     });
 
-    setState(store.read());
+    setState(updated);
 
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
@@ -70,7 +70,7 @@ export default function People() {
       }
     });
 
-    setState(store.prune(process));
+    // setState(store.prune(process));
   };
 
   const handleAdd = async () => {
@@ -84,11 +84,11 @@ export default function People() {
       age: newAge,
     };
 
-    store.mutate((draft) => {
+    const updated = store.mutate((draft) => {
       draft.people = [...draft.people, Operation.Add(newPerson, process)];
     });
 
-    setState(store.read());
+    setState(updated);
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -96,7 +96,7 @@ export default function People() {
       draft.people = [...draft.people, newPerson];
     });
 
-    setState(store.prune(process));
+    // setState(store.prune(process));
   };
 
   return (

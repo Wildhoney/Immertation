@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mutate() > array > using sort with operations 1`] = `
+[
+  "Reid",
+  "Sister",
+  "Allene!",
+]
+`;
+
+exports[`mutate() > array > using sort with operations and duplicate items 1`] = `
+[
+  "Arden",
+  "Orville",
+  "Ibrahim!",
+]
+`;
+
+exports[`mutate() > array > using sort with primitives 1`] = `
+[
+  "Cora",
+  "Dalton",
+  "Sarina",
+]
+`;
