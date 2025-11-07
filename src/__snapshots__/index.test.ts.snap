@@ -8,6 +8,14 @@ exports[`mutate() > array > using sort with operations 1`] = `
 ]
 `;
 
+exports[`mutate() > array > using sort with operations 2`] = `
+[
+  "Reid",
+  "Sister",
+  "Berenice?",
+]
+`;
+
 exports[`mutate() > array > using sort with operations and duplicate items 1`] = `
 [
   "Arden",

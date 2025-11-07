@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Immeration, Revision, Operation } from 'immeration';
+import { State, Operation } from 'immeration';
 import { model } from './utils';
 import { faker } from '@faker-js/faker';
 
 export default function People() {
-  const store = useMemo(() => new Immeration(model), []);
+  const store = useMemo(() => new State(model), []);
   const [state, setState] = useState(() => store.mutate(() => {}));
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -106,23 +106,18 @@ export default function People() {
       </button>{' '}
       <button onClick={handleAdd}>Add person</button>
       <ul>
-        {state.people.get(Revision.Draft).map((person: any) => {
-          const isDeleting = person.is(Operation.Remove);
-          const isUpdating = person.is(Operation.Update);
-          const isAdding = person.is(Operation.Add);
+        {state[0].people.map((person: any, index: number) => {
+          const personAnnotations = (state[1] as any).people[index];
+          const isDeleting = personAnnotations.is(Operation.Remove);
+          const isUpdating = personAnnotations.is(Operation.Update);
+          const isAdding = personAnnotations.is(Operation.Add);
 
-          // When viewing Draft revision, get Current for comparison
-          const currentPerson = person.get(Revision.Current);
-          const currentName = currentPerson?.name.get() ?? person.name.get();
-          const currentAge = currentPerson?.age.get() ?? person.age.get();
-
-          // Draft values
-          const draftName = person.name.get();
-          const draftAge = person.age.get();
+          const draftName = person.name;
+          const draftAge = person.age;
 
           return (
             <li
-              key={person.id.get().toString()}
+              key={person.id.toString()}
               style={{ opacity: isDeleting ? 0.5 : isUpdating || isAdding ? 0.7 : 1 }}
             >
               {isAdding ? (
@@ -132,25 +127,25 @@ export default function People() {
                 </>
               ) : isDeleting ? (
                 <>
-                  {currentName} - {currentAge}{' '}
+                  {draftName} - {draftAge}{' '}
                   <button disabled>Refresh</button>{' '}
                   <button disabled>Deleting...</button>
                 </>
               ) : (
                 <>
-                  {currentName} - {currentAge}
+                  {draftName} - {draftAge}
                   {isUpdating && (
                     <span style={{ color: '#666', marginLeft: '8px' }}>
-                      ({draftName} - {draftAge})
+                      (updating...)
                     </span>
                   )}{' '}
                   <button
-                    onClick={() => handleRefresh(person.id.get())}
+                    onClick={() => handleRefresh(person.id)}
                     disabled={isDeleting || isUpdating}
                   >
                     {isUpdating ? 'Refreshing...' : 'Refresh'}
                   </button>{' '}
-                  <button onClick={() => handleDelete(person.id.get())} disabled={isDeleting}>
+                  <button onClick={() => handleDelete(person.id)} disabled={isDeleting}>
                     Delete
                   </button>
                 </>

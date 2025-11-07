@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { describe, expect, it } from 'vitest';
-import { Immeration, Operation } from '.';
+import { State, Operation } from '.';
 
 describe('mutate()', () => {
   const process = Symbol('process');
@@ -15,20 +15,18 @@ describe('mutate()', () => {
       faker.seed(1);
 
       const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const name = faker.person.firstName() + '!';
-        const model = instance.mutate((draft) => {
-          // draft.name = name;
-          draft.name = Operation.Update(name, process);
+        const [model, annotations] = instance.mutate((draft) => {
+          draft.name = name;
         });
 
         expect(model.name).toEqual(name);
-
-        // expect(model.name.pending()).toBe(false);
-        // expect(model.name.get(Revision.Current)).toEqual(name);
-        // expect(model.name.is(Operation.Update)).toBe(false);
+        expect(annotations.name.pending()).toBe(false);
+        expect(annotations.name.draft()).toEqual(name);
+        expect(annotations.age.draft()).toEqual(initial.age);
       }
     });
 
@@ -36,20 +34,32 @@ describe('mutate()', () => {
       faker.seed(2);
 
       const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const name = faker.person.firstName() + '!';
-        const model = instance.mutate((draft) => {
+        const [model, annotations] = instance.mutate((draft) => {
           draft.name = Operation.Update(name, process);
         });
 
         expect(model.name).toEqual(name);
+        expect(annotations.name.pending()).toBe(true);
+        expect(annotations.name.is(Operation.Update)).toBe(true);
+        expect(annotations.name.is(Operation.Replace)).toBe(false);
+        expect(annotations.name.draft()).toEqual(name);
+      }
 
-        // expect(model.name.pending()).toBe(true);
-        // expect(model.name.get(Revision.Current)).toEqual(initial.name);
-        // expect(model.name.get(Revision.Draft)).toEqual(name);
-        // expect(model.name.is(Operation.Update)).toBe(true);
+      {
+        const name = faker.person.firstName() + '!';
+        const [model, annotations] = instance.mutate((draft) => {
+          draft.name = Operation.Replace(name, process);
+        });
+
+        expect(model.name).toEqual(name);
+        expect(annotations.name.pending()).toBe(true);
+        expect(annotations.name.is(Operation.Update)).toBe(true);
+        expect(annotations.name.is(Operation.Replace)).toBe(true);
+        expect(annotations.name.draft()).toEqual(name);
       }
     });
   });
@@ -68,16 +78,27 @@ describe('mutate()', () => {
         faker.person.firstName(),
       ];
       const initial = { friends };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const names = [faker.person.firstName() + '!', faker.person.firstName() + '?'] as const;
-        const model = instance.mutate((draft) => {
+        const [model, annotations] = instance.mutate((draft) => {
           draft.friends[0] = Operation.Update(names[0], process);
           draft.friends[2] = Operation.Update(names[1], process);
         });
 
         expect(model.friends).toEqual([names[0], friends[1], names[1]]);
+
+        expect(annotations.friends[0].pending()).toBe(true);
+        expect(annotations.friends[1].pending()).toBe(false);
+        expect(annotations.friends[2].pending()).toBe(true);
+
+        expect(annotations.friends[0].is(Operation.Update)).toBe(true);
+        expect(annotations.friends[1].is(Operation.Update)).toBe(false);
+        expect(annotations.friends[2].is(Operation.Update)).toBe(true);
+
+        expect(annotations.friends[0].draft()).toEqual(names[0]);
+        expect(annotations.friends[2].draft()).toEqual(names[1]);
       }
     });
 
@@ -87,21 +108,17 @@ describe('mutate()', () => {
       const initial = {
         friends: [faker.person.firstName(), faker.person.firstName(), faker.person.firstName()],
       };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const name = faker.person.firstName();
-        const model = instance.mutate((draft) => {
+        const [model, annotations] = instance.mutate((draft) => {
           draft.friends.push(name);
         });
 
         expect(model.friends).toEqual([...initial.friends, name]);
         expect(model.friends.length).toBe(initial.friends.length + 1);
-
-        // expect(model.friends.length).toBe(initial.friends.length + 1);
-        // expect(model.friends.at(-1)?.pending()).toBe(false);
-        // expect(model.friends.at(-1)?.get(Revision.Current)).toEqual(friend);
-        // expect(model.friends.at(-1)?.is(Operation.Add)).toBe(false);
+        expect(annotations.friends.pending()).toBe(false);
       }
     });
 
@@ -111,21 +128,27 @@ describe('mutate()', () => {
       const initial = {
         friends: [faker.person.firstName(), faker.person.firstName(), faker.person.firstName()],
       };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const name = faker.person.firstName();
-        const model = instance.mutate((draft) => {
+        const [model, annotations] = instance.mutate((draft) => {
           draft.friends.push(Operation.Add(name, process));
         });
 
         expect(model.friends).toEqual([...initial.friends, name]);
 
-        // expect(model.friends.length).toBe(initial.friends.length + 1);
-        // expect(model.friends.at(-1)?.pending()).toBe(true);
-        // expect(model.friends.at(-1)?.get(Revision.Current)).toBeUndefined();
-        // expect(model.friends.at(-1)?.get(Revision.Draft)).toEqual(friend);
-        // expect(model.friends.at(-1)?.is(Operation.Add)).toBe(true);
+        expect(annotations.friends[0].pending()).toBe(false);
+        expect(annotations.friends[1].pending()).toBe(false);
+        expect(annotations.friends[2].pending()).toBe(false);
+        expect(annotations.friends[3].pending()).toBe(true);
+
+        expect(annotations.friends[0].is(Operation.Add)).toBe(false);
+        expect(annotations.friends[1].is(Operation.Add)).toBe(false);
+        expect(annotations.friends[2].is(Operation.Add)).toBe(false);
+        expect(annotations.friends[3].is(Operation.Add)).toBe(true);
+
+        expect(annotations.friends[3].draft()).toEqual(name);
       }
     });
 
@@ -135,10 +158,10 @@ describe('mutate()', () => {
       const initial = {
         friends: [faker.person.firstName(), faker.person.firstName(), faker.person.firstName()],
       };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
-        const model = instance.mutate((draft) => {
+        const [model] = instance.mutate((draft) => {
           draft.friends = [...draft.friends].sort();
         });
 
@@ -150,24 +173,42 @@ describe('mutate()', () => {
       faker.seed(6);
 
       const initial = {
-        friends: [faker.person.firstName(), faker.person.firstName(), faker.person.firstName()],
+        friends: [
+          faker.person.firstName(),
+          faker.person.firstName() + '!',
+          faker.person.firstName(),
+        ],
       };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const name = faker.person.firstName() + '!';
-        const model = instance.mutate((draft) => {
-          draft.friends[1] = Operation.Update(name, process);
+        const index = initial.friends.findIndex((friend) => friend.endsWith('!'));
+        const [model, annotations] = instance.mutate((draft) => {
+          draft.friends[index] = Operation.Update(name, process);
           draft.friends = Operation.Sort([...draft.friends].sort(), process);
         });
 
         expect(model.friends).toMatchSnapshot();
+        expect(annotations.friends.pending()).toBe(true);
+        expect(annotations.friends.is(Operation.Sort)).toBe(true);
+      }
 
-        // TODO: Implement Extended type with is() and pending() methods
-        // expect(model.friends.is(Operation.Sort)).toBe(true);
-        // expect(model.friends.pending()).toBe(true);
-        // expect(model.friends.at(-1).pending()).toBe(true);
-        // expect(model.friends.at(-1).is(Operation.Update)).toBe(true);
+      {
+        const name = faker.person.firstName() + '?';
+        const [model, annotations] = instance.mutate((draft) => {
+          const index = draft.friends.findIndex((friend) => friend.endsWith('!'));
+          draft.friends[index] = Operation.Replace(name, process);
+        });
+
+        expect(model.friends).toMatchSnapshot();
+
+        const indexAfterReplace = model.friends.findIndex((friend) => friend.endsWith('?'));
+        const annotationAtIndex = annotations.friends[indexAfterReplace];
+        expect(annotationAtIndex.pending()).toBe(true);
+        expect(annotationAtIndex.is(Operation.Update)).toBe(true);
+        expect(annotationAtIndex.is(Operation.Replace)).toBe(true);
+        expect(annotationAtIndex.draft()).toEqual(name);
       }
     });
 
@@ -178,43 +219,56 @@ describe('mutate()', () => {
       const initial = {
         friends: [name, name, faker.person.firstName()],
       };
-      const instance = new Immeration<Model>(initial);
+      const instance = new State<Model>(initial);
 
       {
         const updatedName = faker.person.firstName() + '!';
-        const model = instance.mutate((draft) => {
+        const [model, annotations] = instance.mutate((draft) => {
           draft.friends[1] = Operation.Update(updatedName, process);
           draft.friends = Operation.Sort([...draft.friends].sort(), process);
         });
 
         expect(model.friends).toMatchSnapshot();
+        expect(annotations.friends.pending()).toBe(true);
+        expect(annotations.friends.is(Operation.Sort)).toBe(true);
       }
     });
   });
 });
 
-// describe.skip('prune()', () => {
-//   type Model = {
-//     name: string;
-//     age: number;
-//   };
+describe('prune()', () => {
+  type Model = {
+    name: string;
+    age: number;
+  };
 
-//   it('prunes records by process', () => {
-//     const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-//     const instance = new Immeration<Model>(initial);
-//     const processes = [Symbol('process1'), Symbol('process2')] as const;
+  it('prunes tasks by process', () => {
+    faker.seed(9);
 
-//     instance.mutate((draft) => {
-//       draft.name = Operation.Update(faker.person.firstName(), A.getUnsafe(processes, 0));
-//     });
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const instance = new State<Model>(initial);
+    const processes = [Symbol('process1'), Symbol('process2')] as const;
 
-//     instance.mutate((draft) => {
-//       draft.age = Operation.Update(faker.number.int(100), A.getUnsafe(processes, 1));
-//     });
+    const newName = faker.person.firstName();
+    instance.mutate((draft) => {
+      draft.name = Operation.Update(newName, processes[0]);
+    });
 
-//     const model = instance.prune(A.getUnsafe(processes, 0));
+    const newAge = faker.number.int(100);
+    instance.mutate((draft) => {
+      draft.age = Operation.Update(newAge, processes[1]);
+    });
 
-//     expect(model.name.is(Operation.Update)).toBe(false);
-//     expect(model.age.is(Operation.Update)).toBe(true);
-//   });
-// });
+    const [model, annotations] = instance.prune(processes[0]);
+
+    expect(model.name).toEqual(newName);
+    expect(model.age).toEqual(newAge);
+
+    expect(annotations.name.pending()).toBe(false);
+    expect(annotations.name.is(Operation.Update)).toBe(false);
+
+    expect(annotations.age.pending()).toBe(true);
+    expect(annotations.age.is(Operation.Update)).toBe(true);
+    expect(annotations.age.draft()).toEqual(newAge);
+  });
+});

@@ -1,49 +1,14 @@
-import { type Objectish, Immer, enablePatches, immerable } from 'immer';
+import { Immer, enablePatches, immerable } from 'immer';
 import { A } from '@mobily/ts-belt';
 
 /**
- * Exception types for Immertation errors.
- */
-export enum Exception {
-  /**
-   * Thrown when attempting to access or modify an annotation with no records.
-   */
-  EmptyAnnotations,
-}
-
-/**
- * Custom error class for Immertation-specific exceptions.
- *
- * @example
- * ```typescript
- * throw new ImmertationError(Exception.EmptyAnnotations);
- * ```
- */
-export class ImmertationError extends Error {
-  /**
-   * Creates a new ImmertationError.
-   *
-   * @param type - The exception type
-   */
-  constructor(public type: Exception) {
-    super();
-    this.name = 'ImmertationError';
-  }
-}
-
-/**
- * Configuration for the Immertation system.
+ * Configuration for the state management system.
  */
 export class Config {
   /**
    * The property name used to access the current value in Node instances.
    */
   static separator = 'current' as const;
-
-  /**
-   * A unique symbol representing a nil/empty value.
-   */
-  static nil = Symbol('nil');
 
   /**
    * The Immer instance used for producing and applying patches.
@@ -87,26 +52,11 @@ export enum State {
 }
 
 /**
- * Revision types for accessing values.
- */
-export enum Revision {
-  /** The current committed value */
-  Current,
-  /** The draft value with operations applied */
-  Draft,
-}
-
-/**
- * A snapshot of the model state.
- */
-export type Slice = Objectish;
-
-/**
  * A record of a value change with associated metadata.
  *
  * @template T - The value type
  */
-export type Record<T> = {
+export type Task<T> = {
   /** The value at this point */
   value: T;
   /** The operations applied */
@@ -121,16 +71,16 @@ export type Record<T> = {
 export type Path = string | number | symbol;
 
 /**
- * Tracks changes to a value through a series of records.
+ * Tracks changes to a value through a series of tasks.
  *
  * @template T - The value type
  */
 export class Annotation<T> {
-  /** The list of change records */
-  public records: Record<T>[] = [];
+  /** The list of change tasks */
+  public tasks: Task<T>[] = [];
 
   /**
-   * Creates an empty annotation with no records.
+   * Creates an empty annotation with no tasks.
    *
    * @template T - The value type
    * @returns An empty annotation
@@ -140,69 +90,66 @@ export class Annotation<T> {
   }
 
   /**
-   * Creates an annotation with a single record.
+   * Creates an annotation with a single task.
    *
    * @template T - The value type
    * @param value - The value
    * @param operations - The operations applied
    * @param process - The process identifier
-   * @returns A new annotation with the record
+   * @returns A new annotation with the task
    */
   static create<T>(value: T, operations: State[], process: Process) {
     const annotation = new Annotation<T>();
-    annotation.records = [{ value, operations, process }];
+    annotation.tasks = [{ value, operations, process }];
     return annotation;
   }
 
   /**
-   * Merges two annotations by concatenating their records.
+   * Merges two annotations by concatenating their tasks.
    *
    * @template T - The value type
    * @param a - First annotation
    * @param b - Second annotation
-   * @returns A new annotation with combined records
+   * @returns A new annotation with combined tasks
    */
   static merge<T>(a: Annotation<T>, b: Annotation<T>): Annotation<T> {
     const annotation = new Annotation<T>();
-    annotation.records = [...A.concat(a.records, b.records)];
+    annotation.tasks = [...A.concat(a.tasks, b.tasks)];
     return annotation;
   }
 
   /**
-   * Gets the draft value from the last record.
+   * Restores an annotation from a filtered set of tasks.
    *
-   * @returns The draft value
-   * @throws {ImmertationError} If there are no records
+   * This is primarily used for pruning operations where tasks need to be filtered
+   * by process and restored into a new annotation instance.
+   *
+   * @template T - The value type
+   * @param tasks - The tasks to restore
+   * @returns A new annotation with the provided tasks
+   *
+   * @example
+   * ```typescript
+   * const filtered = annotation.tasks.filter(task => task.process !== processToRemove);
+   * const restored = Annotation.restore(filtered);
+   * ```
    */
-  get draft(): T {
-    const record = A.last(this.records);
-    if (!record) throw new ImmertationError(Exception.EmptyAnnotations);
-    return record.value;
+  static restore<T>(tasks: Task<T>[]): Annotation<T> {
+    const annotation = new Annotation<T>();
+    annotation.tasks = tasks;
+    return annotation;
   }
 
   /**
-   * Gets the operations from the last record.
+   * Gets the value from the most recent task.
    *
-   * @returns The operations array, or empty array if no records
-   */
-  get operations(): State[] {
-    const record = A.last(this.records);
-    if (!record) {
-      return [];
-    }
-    return record.operations;
-  }
-
-  /**
-   * Gets the value from the last record.
+   * This is used internally when unwrapping Annotation instances during patch operations.
    *
-   * @returns The value
-   * @throws {ImmertationError} If there are no records
+   * @returns The value from the last task, or undefined if no tasks exist
    */
-  get value(): T {
-    const record = A.last(this.records);
-    if (!record) throw new ImmertationError(Exception.EmptyAnnotations);
-    return record.value;
+  get value(): T | undefined {
+    const task = A.last(this.tasks);
+    return task?.value;
   }
 }
 
@@ -212,6 +159,12 @@ export class Annotation<T> {
 export class Node<T = unknown> {
   [immerable] = true;
 
+  /**
+   * Creates a new Node instance.
+   *
+   * @param current - The current value stored in this node
+   * @param annotation - The annotation tracking operations on this value (defaults to empty)
+   */
   constructor(
     public current: T,
     public annotation: Annotation<T> = Annotation.empty<T>()
@@ -313,21 +266,6 @@ export class Operation {
 }
 
 /**
- * Internal type for proxied values with get, is, and pending methods.
- *
- * @internal
- */
-type Item<T> = {
-  get: (revision: Revision) => T;
-  is: (operation: Operations) => boolean;
-  pending: () => boolean;
-} & (T extends (infer U)[]
-  ? { [K in keyof T]: Item<U> }
-  : T extends object
-    ? { [K in keyof T]: Item<T[K]> }
-    : globalThis.Record<string, never>);
-
-/**
  * Recursively wraps a type in Node instances.
  *
  * @template T - The base type to wrap
@@ -339,12 +277,57 @@ export type Annotated<T> = T extends (infer U)[]
     : Node<T>;
 
 /**
- * Extended type that provides get, is, and pending methods on all properties.
+ * Helper methods available on annotation proxies for querying operation state.
  *
- * @template T - The base type to extend
+ * These methods are dynamically added to all properties in the model structure
+ * via the proxy returned by `mutate()` and `prune()`.
+ *
+ * @template T - The value type being wrapped
  */
-export type Extended<T> = T extends (infer U)[]
-  ? { [K in keyof T]: Item<U> }
+type Helpers<T = unknown> = {
+  /** Returns true if this property has any pending annotation tasks */
+  pending: () => boolean;
+  /** Checks if this property has a specific operation type in its annotation tasks */
+  is: (operation: Operations) => boolean;
+  /** Returns the value from the most recent annotation task, or the current value if no tasks */
+  draft: () => T;
+};
+
+/**
+ * Recursively augments a type with helper methods at every level.
+ *
+ * This mapped type ensures that the annotation proxy maintains the same structure
+ * as the original model while adding `pending()`, `is()`, and `draft()` methods
+ * to every property at every level of nesting.
+ *
+ * @template T - The base type to augment with helper methods
+ */
+type Augment<T> = T extends (infer U)[]
+  ? {
+      [K in keyof T]: Augment<U>;
+    } & Helpers<U>
   : T extends object
-    ? { [K in keyof T]: Item<T[K]> }
-    : never;
+    ? { [K in keyof T]: Augment<T[K]> } & Helpers<T>
+    : Helpers<T>;
+
+/**
+ * Internal proxy wrapper that holds the actual model value.
+ *
+ * This type is used internally by the proxy handler to wrap the model in an object,
+ * allowing the proxy to work with primitive values as well as objects and arrays.
+ *
+ * @template T - The value type being wrapped
+ * @internal
+ */
+export type Wrapper<T> = { value: T };
+
+/**
+ * The return type of annotation proxies from `mutate()` and `prune()`.
+ *
+ * This type provides type-safe access to helper methods on all properties in the model.
+ * It maintains the same structure as the original model while adding `pending()`, `is()`,
+ * and `draft()` methods to every property path.
+ *
+ * @template T - The model type being wrapped with helper methods
+ */
+export type Target<T> = Augment<T>;
