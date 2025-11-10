@@ -1,5 +1,5 @@
 import { Immer, enablePatches, immerable } from 'immer';
-import { A } from '@mobily/ts-belt';
+import { A, F } from '@mobily/ts-belt';
 
 /**
  * Configuration for the state management system.
@@ -29,14 +29,36 @@ export class Config {
 export type Recipe<M> = (draft: M) => void;
 
 /**
+ * A function that returns a unique identifier for a value.
+ * Used to track values through array operations (sort, reorder, replacement).
+ *
+ * @template T - The value type
+ * @returns A unique identifier (string, number, or symbol), or undefined/void to fall back to F.equals
+ */
+export type Identity<T = unknown> = [T] extends [never]
+  ? (value: unknown) => string | number | symbol | undefined | void
+  : (
+      value: Exclude<
+        T extends (infer U)[]
+          ? Identity<U> | U
+          : T extends object
+            ? { [K in keyof T]: Identity<T[K]> }[keyof T] | T
+            : never,
+        undefined
+      >
+    ) => string | number | symbol | undefined | void;
+
+export const defaultIdentity: Identity = (F as any).ignore;
+
+/**
  * A unique identifier for a mutation process.
  */
 export type Process = symbol;
 
 /**
- * Operation states that can be applied to values.
+ * Operation events that can be applied to values.
  */
-export enum State {
+export enum Event {
   /** Value was added */
   Add,
   /** Value was removed */
@@ -58,9 +80,9 @@ export enum State {
  */
 export type Task<T> = {
   /** The value at this point */
-  value: T;
+  state: T;
   /** The operations applied */
-  operations: State[];
+  operations: Event[];
   /** The process that created this record */
   process: Process;
 };
@@ -98,9 +120,9 @@ export class Annotation<T> {
    * @param process - The process identifier
    * @returns A new annotation with the task
    */
-  static create<T>(value: T, operations: State[], process: Process) {
+  static create<T>(value: T, operations: Event[], process: Process) {
     const annotation = new Annotation<T>();
-    annotation.tasks = [{ value, operations, process }];
+    annotation.tasks = [{ state: value, operations, process }];
     return annotation;
   }
 
@@ -147,9 +169,9 @@ export class Annotation<T> {
    *
    * @returns The value from the last task, or undefined if no tasks exist
    */
-  get value(): T | undefined {
+  state(): T | undefined {
     const task = A.last(this.tasks);
-    return task?.value;
+    return task?.state;
   }
 }
 
@@ -180,7 +202,8 @@ export type Operations =
   | typeof Operation.Update
   | typeof Operation.Move
   | typeof Operation.Replace
-  | typeof Operation.Sort;
+  | typeof Operation.Sort
+  | typeof Operation.Custom;
 
 /**
  * Factory for creating annotated values with operation markers.
@@ -201,7 +224,7 @@ export class Operation {
    * @returns The annotated value
    */
   static Add<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Add], process) as T;
+    return Annotation.create(value, [Event.Add], process) as T;
   }
 
   /**
@@ -213,7 +236,7 @@ export class Operation {
    * @returns The annotated value
    */
   static Remove<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Remove], process) as T;
+    return Annotation.create(value, [Event.Remove], process) as T;
   }
 
   /**
@@ -225,7 +248,7 @@ export class Operation {
    * @returns The annotated value
    */
   static Update<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Update], process) as T;
+    return Annotation.create(value, [Event.Update], process) as T;
   }
 
   /**
@@ -237,11 +260,11 @@ export class Operation {
    * @returns The annotated value
    */
   static Move<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Move], process) as T;
+    return Annotation.create(value, [Event.Move], process) as T;
   }
 
   /**
-   * Marks a value as replaced (combines Update and Replace states).
+   * Marks a value as replaced (combines Update and Replace events).
    *
    * @template T - The value type
    * @param value - The value to mark
@@ -249,7 +272,7 @@ export class Operation {
    * @returns The annotated value
    */
   static Replace<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Replace], process) as T;
+    return Annotation.create(value, [Event.Replace], process) as T;
   }
 
   /**
@@ -261,7 +284,26 @@ export class Operation {
    * @returns The annotated value
    */
   static Sort<T>(value: T, process: Process): T {
-    return Annotation.create(value, [State.Sort], process) as T;
+    return Annotation.create(value, [Event.Sort], process) as T;
+  }
+
+  /**
+   * Marks a value with custom operation events.
+   *
+   * @template T - The value type
+   * @param value - The value to mark
+   * @param operations - The array of operation events to apply
+   * @param process - The process identifier
+   * @returns The annotated value
+   *
+   * @example
+   * ```typescript
+   * const process = Symbol('custom');
+   * draft.item = Operation.Custom(newValue, [Event.Update, Event.Move], process);
+   * ```
+   */
+  static Custom<T>(value: T, operations: Event[], process: Process): T {
+    return Annotation.create(value, operations, process) as T;
   }
 }
 
@@ -277,41 +319,41 @@ export type Annotated<T> = T extends (infer U)[]
     : Node<T>;
 
 /**
- * Helper methods available on annotation proxies for querying operation state.
+ * Decorated methods available on annotation proxies for querying operation state.
  *
  * These methods are dynamically added to all properties in the model structure
  * via the proxy returned by `mutate()` and `prune()`.
  *
  * @template T - The value type being wrapped
  */
-type Helpers<T = unknown> = {
+type Decorated<T = unknown> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
   /** Checks if this property has a specific operation type in its annotation tasks */
-  is: (operation: Operations) => boolean;
+  is(operation: Operations): boolean;
   /** Returns the value from the most recent annotation task, or the current value if no tasks */
-  draft: () => T;
+  draft(): T;
 };
 
 /**
- * Recursively augments a type with helper methods at every level.
+ * Recursively decorates a type with helper methods at every level.
  *
  * This mapped type ensures that the annotation proxy maintains the same structure
  * as the original model while adding `pending()`, `is()`, and `draft()` methods
  * to every property at every level of nesting.
  *
- * @template T - The base type to augment with helper methods
+ * @template T - The base type to decorate with helper methods
  */
-type Augment<T> = T extends (infer U)[]
+type Decorate<T> = T extends (infer U)[]
   ? {
-      [K in keyof T]: Augment<U>;
-    } & Helpers<U>
+      [K in keyof T]: Decorate<U>;
+    } & Decorated<U>
   : T extends object
-    ? { [K in keyof T]: Augment<T[K]> } & Helpers<T>
-    : Helpers<T>;
+    ? { [K in keyof T]: Decorate<T[K]> } & Decorated<T>
+    : Decorated<T>;
 
 /**
- * Internal proxy wrapper that holds the actual model value.
+ * Internal proxy box that holds the actual model value.
  *
  * This type is used internally by the proxy handler to wrap the model in an object,
  * allowing the proxy to work with primitive values as well as objects and arrays.
@@ -319,7 +361,7 @@ type Augment<T> = T extends (infer U)[]
  * @template T - The value type being wrapped
  * @internal
  */
-export type Wrapper<T> = { value: T };
+export type Box<T> = { value: T };
 
 /**
  * The return type of annotation proxies from `mutate()` and `prune()`.
@@ -330,4 +372,4 @@ export type Wrapper<T> = { value: T };
  *
  * @template T - The model type being wrapped with helper methods
  */
-export type Target<T> = Augment<T>;
+export type Target<T> = Decorate<T>;

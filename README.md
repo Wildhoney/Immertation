@@ -10,6 +10,9 @@ Operations are particularly useful for async operations and optimistic updates, 
   - [Using operations](#using-operations)
   - [Available operations](#available-operations)
   - [Pruning operations](#pruning-operations)
+  - [Value-based tracking](#value-based-tracking)
+    - [Arrays](#arrays)
+    - [Objects](#objects)
 
 ## Getting started
 
@@ -28,19 +31,19 @@ const store = new State<Model>({
   age: 30
 });
 
-// Mutate the model - returns [model, annotations]
-const [model, annotations] = store.mutate((draft) => {
+// Mutate the model
+store.mutate((draft) => {
   draft.name = 'Jane';
   draft.age = 31;
 });
 
 // Access values from the model
-console.log(model.name); // 'Jane'
-console.log(model.age);  // 31
+console.log(store.model.name); // 'Jane'
+console.log(store.model.age);  // 31
 
-// Check operation state from annotations
-console.log(annotations.name.pending()); // false - no operations tracked
-console.log(annotations.age.pending());  // false
+// Check operation state from annotations using inspect
+console.log(store.inspect.name.pending()); // false - no operations tracked
+console.log(store.inspect.age.pending());  // false
 ```
 
 ### Using operations
@@ -50,23 +53,23 @@ Operations allow you to track pending changes with annotations. This is especial
 ```typescript
 const process = Symbol('update-user');
 
-const [model, annotations] = store.mutate((draft) => {
+store.mutate((draft) => {
   draft.name = Operation.Update('Jane', process);
   draft.age = Operation.Update(31, process);
 });
 
 // Model contains the updated values
-console.log(model.name); // 'Jane'
-console.log(model.age);  // 31
+console.log(store.model.name); // 'Jane'
+console.log(store.model.age);  // 31
 
-// Annotations provide helper methods to check operation state
-console.log(annotations.name.pending()); // true - has pending operations
-console.log(annotations.name.is(Operation.Update)); // true
-console.log(annotations.name.is(Operation.Add));    // false
+// Inspect provides helper methods to check operation state
+console.log(store.inspect.name.pending()); // true - has pending operations
+console.log(store.inspect.name.is(Operation.Update)); // true
+console.log(store.inspect.name.is(Operation.Add));    // false
 
 // Get the draft value from the most recent annotation
-console.log(annotations.name.draft()); // 'Jane'
-console.log(annotations.age.draft());  // 31
+console.log(store.inspect.name.draft()); // 'Jane'
+console.log(store.inspect.age.draft());  // 31
 ```
 
 ### Available operations
@@ -95,17 +98,57 @@ store.mutate((draft) => {
 });
 
 // Remove all operations from process1
-const [model, annotations] = store.prune(process1);
+store.prune(process1);
 
 // Model is unchanged (pruning only affects annotations)
-console.log(model.name); // 'Alice'
-console.log(model.age);  // 25
+console.log(store.model.name); // 'Alice'
+console.log(store.model.age);  // 25
 
 // Annotations from process1 are removed
-console.log(annotations.name.pending()); // false - was pruned
-console.log(annotations.name.is(Operation.Update)); // false
+console.log(store.inspect.name.pending()); // false - was pruned
+console.log(store.inspect.name.is(Operation.Update)); // false
 
 // Annotations from process2 remain
-console.log(annotations.age.pending()); // true
-console.log(annotations.age.is(Operation.Update));  // true
+console.log(store.inspect.age.pending()); // true
+console.log(store.inspect.age.is(Operation.Update));  // true
 ```
+
+### Value-based tracking
+
+Annotations follow values, not positions. When values match by identity, annotations are preserved through sorts, replacements, and reorders.
+
+#### Arrays
+
+```typescript
+const store = new State({ friends: ['Alice', 'Bob', 'Charlie'] });
+const process = Symbol('update');
+
+store.mutate((draft) => {
+  draft.friends[0] = Operation.Update('Alice-Updated', process);
+  draft.friends.sort(); // Annotation follows 'Alice-Updated' to its new position
+});
+```
+
+For object arrays, provide an identity function:
+
+```typescript
+const store = new State(
+  { people: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] },
+  (value) => (value as Person).id  // Track by id
+);
+```
+
+#### Objects
+
+Annotations survive object replacements when values match:
+
+```typescript
+const store = new State({ user: { name: 'Alice', age: 30 } });
+
+store.mutate((draft) => {
+  draft.user.name = Operation.Update('Alice', process);
+});
+
+store.mutate((draft) => {
+  draft.user = { name: 'Alice', age: 31 };  // 'Alice' annotation preserved
+});
