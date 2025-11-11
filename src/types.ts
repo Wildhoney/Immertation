@@ -351,7 +351,7 @@ type Decorated<T = unknown> = {
  *
  * @template T - The base type to decorate with helper methods
  */
-type Decorate<T> = T extends (infer U)[]
+export type Decorate<T> = T extends (infer U)[]
   ? {
       [K in keyof T]: Decorate<U>;
     } & Decorated<U>
@@ -369,14 +369,3 @@ type Decorate<T> = T extends (infer U)[]
  * @internal
  */
 export type Box<T> = { value: T };
-
-/**
- * The return type of annotation proxies from `mutate()` and `prune()`.
- *
- * This type provides type-safe access to helper methods on all properties in the model.
- * It maintains the same structure as the original model while adding `pending()`, `is()`,
- * and `draft()` methods to every property path.
- *
- * @template T - The model type being wrapped with helper methods
- */
-export type Target<T> = Decorate<T>;

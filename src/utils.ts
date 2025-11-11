@@ -3,7 +3,7 @@ import type {
   Annotated,
   Path,
   Operations,
-  Target,
+  Decorate,
   Box,
   Process,
   Task,
@@ -109,7 +109,7 @@ export function event(operation: Operations): Event | undefined {
  * store.inspect.name.draft() // 'Jane' - value from latest task
  * ```
  */
-export function decorate<M>(node: Annotated<M>, model?: M): Target<M> {
+export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
   const actual = G.isNotNullable(model) ? model : (node[Config.separator] as M);
 
   const handler: ProxyHandler<Box<M>> = {
@@ -163,7 +163,7 @@ export function decorate<M>(node: Annotated<M>, model?: M): Target<M> {
     },
   };
 
-  return new Proxy({ value: actual }, handler) as unknown as Target<M>;
+  return new Proxy({ value: actual }, handler) as unknown as Decorate<M>;
 }
 
 /**

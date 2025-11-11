@@ -1,5 +1,5 @@
 import type { Objectish } from 'immer';
-import type { Recipe, Annotated, Target, Process, Identity, Listener } from './types';
+import type { Recipe, Annotated, Process, Identity, Listener, Decorate } from './types';
 import { apply, annotate, decorate, prune as cleanup } from './utils';
 import { F } from '@mobily/ts-belt';
 
@@ -119,7 +119,7 @@ export class State<M extends Objectish> {
    * console.log(store.inspect.name.draft()); // 'Jane' - value from latest record
    * ```
    */
-  get inspect(): Target<M> {
+  get inspect(): Decorate<M> {
     return decorate(this.#annotations, this.#model);
   }
 
@@ -237,3 +237,4 @@ export class State<M extends Objectish> {
 }
 
 export { Operation, Event } from './types';
+export type { Decorate } from './types';
