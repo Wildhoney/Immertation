@@ -1,6 +1,7 @@
 {
   "name": "immeration",
   "version": "0.0.4",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/immeration.cjs",
   "module": "./dist/immeration.mjs",
