@@ -1,0 +1,16 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
+## 0.0.2 (2025-11-11)
+
+
+### Features
+
+* added additional logic around adding and removing items ([9946099](https://github.com/Wildhoney/Immertation/commit/99460996724621f62e4d1ca03f5a498a4287f465))
+* added example ([f1e5c27](https://github.com/Wildhoney/Immertation/commit/f1e5c271a849ec606c2309e2e2703f3d7d3c6a2d))
+* added listener ([258cc88](https://github.com/Wildhoney/Immertation/commit/258cc88b0180e77d0ede84af214ef0caeddd339b))
+* added the annotation proxy and associated tests ([87cabe1](https://github.com/Wildhoney/Immertation/commit/87cabe10671cbfccb2f9237332db1b09fff59dfc))
+* implemented approach using value matching ([9661c22](https://github.com/Wildhoney/Immertation/commit/9661c2267b7c2ac0fc16e5311e35e1cf567fd9bc))
+* returned to the basics with managing model and annotations in separate objects ([a6e5a56](https://github.com/Wildhoney/Immertation/commit/a6e5a56fcc2b15d5268c80f06fadf783bb700c42))
+* simplified the implementation by augmenting the recipe ([967b1f3](https://github.com/Wildhoney/Immertation/commit/967b1f363307a244eecdf017044df0c2850e5f64))
