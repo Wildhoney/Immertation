@@ -2,9 +2,22 @@
   "name": "immeration",
   "version": "0.0.2",
   "type": "module",
+  "main": "./dist/immeration.cjs",
+  "module": "./dist/immeration.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/immeration.mjs",
+      "require": "./dist/immeration.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "preview": "vite preview",
     "unit": "vitest run",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
@@ -13,6 +26,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
+    "@mobily/ts-belt": "^3.13.1",
     "@types/lodash": "^4.17.20",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
@@ -23,17 +37,19 @@
     "commit-and-tag-version": "^12.6.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
+    "immer": "^10.2.0",
+    "lodash": "^4.17.21",
     "prettier": "^3.6.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "traverse": "^0.6.11",
     "typescript": "~5.9.3",
     "vite": "^7.2.1",
     "vitest": "^4.0.7"
   },
-  "dependencies": {
-    "@mobily/ts-belt": "^3.13.1",
-    "immer": "^10.2.0",
-    "lodash": "^4.17.21",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "traverse": "^0.6.11"
+  "peerDependencies": {
+    "@mobily/ts-belt": "^3.0.0",
+    "immer": "^6.0.0",
+    "lodash": "^4.17.0"
   }
 }
