@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.3](https://github.com/Wildhoney/Immertation/compare/v0.1.2...v0.1.3) (2025-11-11)
+
+
+### Bug Fixes
+
+* type definitions in package ([591f7ad](https://github.com/Wildhoney/Immertation/commit/591f7adfc96b013f5b45d22b23950dcff0b5f3b8))
+
 ## [0.1.2](https://github.com/Wildhoney/Immertation/compare/v0.1.1...v0.1.2) (2025-11-11)
 
 
