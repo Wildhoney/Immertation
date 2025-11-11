@@ -56,6 +56,13 @@ export const defaultIdentity: Identity = (F as any).ignore;
 export type Process = symbol;
 
 /**
+ * A listener function that is called when state changes.
+ *
+ * @template T - The state type
+ */
+export type Listener<T> = (state: T) => void;
+
+/**
  * Operation events that can be applied to values.
  */
 export enum Event {

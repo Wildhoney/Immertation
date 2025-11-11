@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { State, Operation, Event } from '.';
 import { A } from '@mobily/ts-belt';
 
@@ -629,5 +629,158 @@ describe('prune()', () => {
     expect(state.inspect.age.pending()).toBe(true);
     expect(state.inspect.age.is(Operation.Update)).toBe(true);
     expect(state.inspect.age.draft()).toEqual(newAge);
+  });
+});
+
+describe('listen()', () => {
+  type Model = {
+    name: string;
+    age: number;
+  };
+
+  /**
+   * Tests that a registered listener is called when mutate() updates the model
+   * and receives the correct State instance with the updated model.
+   */
+  it('invokes listener on mutate', () => {
+    faker.seed(20);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+    const name = faker.person.firstName();
+
+    expect.assertions(1);
+
+    state.listen((state) => {
+      expect(state.model.name).toBe(name);
+    });
+
+    state.mutate((draft) => void (draft.name = name));
+  });
+
+  /**
+   * Tests that a registered listener is called when prune() removes annotations
+   * and receives the correct State instance.
+   */
+  it('invokes listener on prune', () => {
+    faker.seed(21);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+    const process = Symbol('process');
+    const name = faker.person.firstName();
+
+    expect.assertions(2);
+
+    state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
+
+    state.listen((state) => {
+      expect(state.model.name).toBe(name);
+      expect(state.inspect.name.pending()).toBe(false);
+    });
+
+    state.prune(process);
+  });
+
+  /**
+   * Tests that multiple listeners can be registered and all are invoked
+   * when the state changes.
+   */
+  it('supports multiple listeners', () => {
+    faker.seed(22);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+    const listener3 = vi.fn();
+
+    state.listen(listener1);
+    state.listen(listener2);
+    state.listen(listener3);
+
+    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
+    expect(listener3).toHaveBeenCalledTimes(1);
+
+    state.mutate((draft) => void (draft.age = faker.number.int(100)));
+
+    expect(listener1).toHaveBeenCalledTimes(2);
+    expect(listener2).toHaveBeenCalledTimes(2);
+    expect(listener3).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * Tests that the unsubscribe function returned by listen() correctly
+   * removes the listener so it no longer receives updates.
+   */
+  it('unsubscribe removes listener', () => {
+    faker.seed(23);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+
+    const listener = vi.fn();
+
+    const unsubscribe = state.listen(listener);
+
+    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+
+    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+    expect(listener).toHaveBeenCalledTimes(1); // Not called again
+  });
+
+  /**
+   * Tests that unsubscribing one listener doesn't affect other listeners.
+   */
+  it('unsubscribing one listener does not affect others', () => {
+    faker.seed(24);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+
+    const unsubscribe1 = state.listen(listener1);
+    state.listen(listener2);
+
+    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
+
+    unsubscribe1();
+
+    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+    expect(listener1).toHaveBeenCalledTimes(1); // Not called again
+    expect(listener2).toHaveBeenCalledTimes(2); // Still called
+  });
+
+  /**
+   * Tests that listeners can access both model and inspect proxy
+   * through the received State instance.
+   */
+  it('listener can access model and inspect', () => {
+    faker.seed(25);
+
+    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+    const state = new State<Model>(initial);
+    const process = Symbol('process');
+    const name = faker.person.firstName();
+
+    expect.assertions(2);
+
+    state.listen((state) => {
+      expect(state.model.name).toBe(name);
+      expect(state.inspect.name.pending()).toBe(true);
+    });
+
+    state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
   });
 });

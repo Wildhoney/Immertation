@@ -1,5 +1,5 @@
 import type { Objectish } from 'immer';
-import type { Recipe, Annotated, Target, Process, Identity } from './types';
+import type { Recipe, Annotated, Target, Process, Identity, Listener } from './types';
 import { apply, annotate, decorate, prune as cleanup } from './utils';
 import { F } from '@mobily/ts-belt';
 
@@ -50,6 +50,12 @@ export class State<M extends Objectish> {
    * @private
    */
   #identity: Identity<M>;
+
+  /**
+   * Set of listener functions to call when state changes.
+   * @private
+   */
+  #listeners: Set<Listener<this>> = new Set();
 
   /**
    * Creates a new State instance.
@@ -149,6 +155,7 @@ export class State<M extends Objectish> {
     const [model, annotations] = apply<M>(this.#model, this.#annotations, recipe, this.#identity);
     this.#model = model;
     this.#annotations = annotations;
+    this.#notify();
   }
 
   /**
@@ -176,6 +183,56 @@ export class State<M extends Objectish> {
    */
   prune(process: Process): void {
     this.#annotations = cleanup(this.#annotations, process);
+    this.#notify();
+  }
+
+  /**
+   * Registers a listener function to be called whenever the model or annotations change.
+   *
+   * The listener receives the State instance (this) as its argument, allowing access to
+   * the updated model and inspection proxy. This is useful for integrating with reactive
+   * frameworks like React.
+   *
+   * @param listener - Function to call when state changes, receives the State instance
+   * @returns A function to unsubscribe the listener
+   *
+   * @example
+   * ```typescript
+   * const store = new State({ count: 0 });
+   *
+   * const unsubscribe = store.listen((state) => {
+   *   console.log('Count changed:', state.model.count);
+   * });
+   *
+   * store.mutate((draft) => {
+   *   draft.count = 1;
+   * }); // Logs: "Count changed: 1"
+   *
+   * unsubscribe(); // Remove listener
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // React integration
+   * const [, forceUpdate] = useReducer((x) => x + 1, 0);
+   *
+   * useEffect(() => {
+   *   const unsubscribe = store.listen(() => forceUpdate());
+   *   return unsubscribe;
+   * }, []);
+   * ```
+   */
+  listen(listener: Listener<this>): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  /**
+   * Notifies all registered listeners of a state change.
+   * @private
+   */
+  #notify(): void {
+    this.#listeners.forEach((listener) => listener(this));
   }
 }
 

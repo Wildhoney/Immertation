@@ -10,6 +10,7 @@ Operations are particularly useful for async operations and optimistic updates, 
   - [Using operations](#using-operations)
   - [Available operations](#available-operations)
   - [Pruning operations](#pruning-operations)
+  - [Listening to changes](#listening-to-changes)
   - [Value-based tracking](#value-based-tracking)
     - [Arrays](#arrays)
     - [Objects](#objects)
@@ -111,6 +112,42 @@ console.log(store.inspect.name.is(Operation.Update)); // false
 // Annotations from process2 remain
 console.log(store.inspect.age.pending()); // true
 console.log(store.inspect.age.is(Operation.Update));  // true
+```
+
+### Listening to changes
+
+Register listeners to be notified whenever the model or annotations change. This is particularly useful for integrating with reactive frameworks like React:
+
+```typescript
+const store = new State({ count: 0 });
+
+// Register a listener
+const unsubscribe = store.listen((state) => {
+  console.log('Count changed:', state.model.count);
+  console.log('Has pending operations:', state.inspect.count.pending());
+});
+
+store.mutate((draft) => {
+  draft.count = 1;
+}); // Logs: "Count changed: 1"
+
+// Clean up when done
+unsubscribe();
+```
+
+**React integration example:**
+
+```typescript
+function useStore<M>(store: State<M>) {
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+
+  useEffect(() => {
+    const unsubscribe = store.listen(() => forceUpdate());
+    return unsubscribe;
+  }, [store]);
+
+  return store;
+}
 ```
 
 ### Value-based tracking
