@@ -1,4 +1,4 @@
-.PHONY: fmt lint typecheck unit build checks start
+.PHONY: fmt lint typecheck unit build checks start deploy
 
 fmt:
 	npm run fmt
@@ -19,3 +19,11 @@ start:
 	npm run dev
 
 checks: fmt lint typecheck unit
+
+deploy:
+	yarn --force
+	make build
+	npx commit-and-tag-version
+	npm publish
+	git push
+	git push --tags

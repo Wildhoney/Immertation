@@ -1,6 +1,5 @@
 {
   "name": "immeration",
-  "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
@@ -21,6 +20,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitejs/plugin-react": "^5.1.0",
+    "commit-and-tag-version": "^12.6.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
