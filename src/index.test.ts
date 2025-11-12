@@ -92,6 +92,40 @@ describe('mutate()', () => {
       expect(state.inspect.name.is(Operation.Replace)).toBe(false);
       expect(state.inspect.name.draft()).toEqual(name);
     });
+
+    /**
+     * Tests that remaining() returns the correct count of annotation tasks,
+     * including tracking through multiple operations and after pruning.
+     */
+    it('using remaining() to count annotation tasks', () => {
+      faker.seed(4);
+
+      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+      const state = new State<Model>(initial);
+
+      expect(state.inspect.name.remaining()).toBe(0);
+      expect(state.inspect.name.pending()).toBe(false);
+
+      {
+        const name = faker.person.firstName() + '!';
+        state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
+
+        expect(state.inspect.name.remaining()).toBe(1);
+        expect(state.inspect.name.pending()).toBe(true);
+      }
+
+      {
+        const name = faker.person.firstName() + '!';
+        state.mutate((draft) => void (draft.name = Operation.Replace(name, process)));
+
+        expect(state.inspect.name.remaining()).toBe(2);
+        expect(state.inspect.name.pending()).toBe(true);
+      }
+
+      state.prune(process);
+      expect(state.inspect.name.remaining()).toBe(0);
+      expect(state.inspect.name.pending()).toBe(false);
+    });
   });
 
   describe('array', () => {

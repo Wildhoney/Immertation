@@ -85,8 +85,9 @@ export function event(operation: Operations): Event | undefined {
  * Creates a proxy over the model that provides annotation helper methods for any property.
  *
  * This function generates the inspection proxy returned by the `inspect` getter. The proxy
- * dynamically provides three methods on every property path in the model:
+ * dynamically provides four methods on every property path in the model:
  * - `pending()`: Returns true if the property has annotation tasks
+ * - `remaining()`: Returns the count of annotation tasks for the property
  * - `is(Operation)`: Checks if a specific operation type exists in the property's annotations
  * - `draft()`: Returns the value from the most recent annotation task
  *
@@ -105,6 +106,7 @@ export function event(operation: Operations): Event | undefined {
  * });
  *
  * store.inspect.name.pending() // true - has annotation tasks
+ * store.inspect.name.remaining() // 1 - number of annotation tasks
  * store.inspect.name.is(Operation.Update) // true - has Update operation
  * store.inspect.name.draft() // 'Jane' - value from latest task
  * ```
@@ -117,6 +119,9 @@ export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
       switch (property) {
         case 'pending':
           return (): boolean => A.isNotEmpty(node.annotation.tasks as readonly Task<unknown>[]);
+
+        case 'remaining':
+          return (): number => (node.annotation.tasks as readonly Task<unknown>[]).length;
 
         case 'is':
           return (operation: Operations): boolean => {

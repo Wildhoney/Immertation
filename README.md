@@ -65,6 +65,7 @@ console.log(store.model.age);  // 31
 
 // Inspect provides helper methods to check operation state
 console.log(store.inspect.name.pending()); // true - has pending operations
+console.log(store.inspect.name.remaining()); // 1 - count of pending operations
 console.log(store.inspect.name.is(Operation.Update)); // true
 console.log(store.inspect.name.is(Operation.Add));    // false
 

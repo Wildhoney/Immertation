@@ -336,6 +336,8 @@ export type Annotated<T> = T extends (infer U)[]
 type Decorated<T = unknown> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
+  /** Returns the count of annotation tasks for this property */
+  remaining: () => number;
   /** Checks if this property has a specific operation type in its annotation tasks */
   is(operation: Operations): boolean;
   /** Returns the value from the most recent annotation task, or the current value if no tasks */

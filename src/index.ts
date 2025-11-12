@@ -101,10 +101,11 @@ export class State<M extends Objectish> {
    *
    * The inspect proxy provides helper methods for checking operation state
    * on any property path in the model structure. Use `pending()` to check if a property has
-   * pending operations, `is(Operation)` to check for specific operation types, and `draft()` to
-   * get the value from the most recent annotation record.
+   * pending operations, `remaining()` to get the count of pending operations, `is(Operation)`
+   * to check for specific operation types, and `draft()` to get the value from the most recent
+   * annotation record.
    *
-   * @returns An inspection proxy providing `pending()`, `is()`, and `draft()` methods on all properties
+   * @returns An inspection proxy providing `pending()`, `remaining()`, `is()`, and `draft()` methods on all properties
    *
    * @example
    * ```typescript
@@ -115,6 +116,7 @@ export class State<M extends Objectish> {
    *
    * console.log(store.model.name); // 'Jane'
    * console.log(store.inspect.name.pending()); // true - has annotation tasks
+   * console.log(store.inspect.name.remaining()); // 1 - number of annotation tasks
    * console.log(store.inspect.name.is(Operation.Update)); // true - has Update operation
    * console.log(store.inspect.name.draft()); // 'Jane' - value from latest record
    * ```
