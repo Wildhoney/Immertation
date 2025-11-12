@@ -1,4 +1,4 @@
-# Immeration
+# Immertation
 
 A state management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.
 
@@ -18,7 +18,7 @@ Operations are particularly useful for async operations and optimistic updates, 
 ## Getting started
 
 ```typescript
-import { State, Operation } from 'immeration';
+import { State, Operation } from 'immertation';
 
 // Define your model type
 type Model = {

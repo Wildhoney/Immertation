@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { State, Operation } from 'immeration';
+import { State, Operation } from 'immertation';
 import { model } from './utils';
 import { faker } from '@faker-js/faker';
 

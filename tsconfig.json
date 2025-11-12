@@ -17,7 +17,7 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "immeration": ["./src/index.ts"]
+      "immertation": ["./src/index.ts"]
     },
 
     /* Linting */

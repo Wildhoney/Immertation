@@ -1,16 +1,16 @@
 {
-  "name": "immeration",
+  "name": "immertation",
   "version": "0.1.3",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/immeration.cjs",
-  "module": "./dist/immeration.mjs",
+  "main": "./dist/immertation.cjs",
+  "module": "./dist/immertation.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/immeration.mjs",
-      "require": "./dist/immeration.cjs"
+      "import": "./dist/immertation.mjs",
+      "require": "./dist/immertation.cjs"
     }
   },
   "files": [

@@ -7,16 +7,16 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      'immeration': path.resolve(__dirname, './src/index.ts'),
+      'immertation': path.resolve(__dirname, './src/index.ts'),
     },
   },
   build: {
     emptyOutDir: false,
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
-      name: 'Immeration',
+      name: 'Immertation',
       formats: ['es', 'cjs'],
-      fileName: (format) => `immeration.${format === 'es' ? 'mjs' : 'cjs'}`,
+      fileName: (format) => `immertation.${format === 'es' ? 'mjs' : 'cjs'}`,
     },
     rollupOptions: {
       external: [
