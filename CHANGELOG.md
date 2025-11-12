@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.5](https://github.com/Wildhoney/Immertation/compare/v0.1.4...v0.1.5) (2025-11-12)
+
+
+### Features
+
+* added remaining() method for determining tasks remaining ([ee86690](https://github.com/Wildhoney/Immertation/commit/ee8669054322293ee27adcd55abd6b62a9d7edc2))
+
 ## [0.1.4](https://github.com/Wildhoney/Immertation/compare/v0.1.3...v0.1.4) (2025-11-12)
 
 ## [0.1.3](https://github.com/Wildhoney/Immertation/compare/v0.1.2...v0.1.3) (2025-11-11)
