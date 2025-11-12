@@ -126,6 +126,57 @@ describe('mutate()', () => {
       expect(state.inspect.name.remaining()).toBe(0);
       expect(state.inspect.name.pending()).toBe(false);
     });
+
+    /**
+     * Tests that box() returns an object with model and inspect properties,
+     * making it easy to pass annotated values to components.
+     */
+    it('using box() to get model and inspect', () => {
+      faker.seed(5);
+
+      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+      const state = new State<Model>(initial);
+
+      {
+        const box = state.inspect.name.box();
+        expect(box.model).toBe(initial.name);
+        expect(box.inspect.pending()).toBe(false);
+        expect(box.inspect.remaining()).toBe(0);
+      }
+
+      {
+        const name = faker.person.firstName() + '!';
+        state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
+
+        const box = state.inspect.name.box();
+        expect(box.model).toBe(name);
+        expect(box.inspect.pending()).toBe(true);
+        expect(box.inspect.remaining()).toBe(1);
+        expect(box.inspect.is(Operation.Update)).toBe(true);
+        expect(box.inspect.draft()).toBe(name);
+      }
+
+      {
+        const name = faker.person.firstName() + '?';
+        state.mutate((draft) => void (draft.name = Operation.Replace(name, process)));
+
+        const box = state.inspect.name.box();
+        expect(box.model).toBe(name);
+        expect(box.inspect.pending()).toBe(true);
+        expect(box.inspect.remaining()).toBe(2);
+        expect(box.inspect.is(Operation.Update)).toBe(true);
+        expect(box.inspect.is(Operation.Replace)).toBe(true);
+        expect(box.inspect.draft()).toBe(name);
+      }
+
+      {
+        state.prune(process);
+        const box = state.inspect.name.box();
+        expect(box.model).toBe(state.model.name);
+        expect(box.inspect.pending()).toBe(false);
+        expect(box.inspect.remaining()).toBe(0);
+      }
+    });
   });
 
   describe('array', () => {
@@ -327,25 +378,22 @@ describe('mutate()', () => {
       };
       const state = new State<Model>(initial);
 
-      // Add operations to individual items
       state.mutate((draft) => {
         draft.friends[0] = Operation.Update('Alice-Updated', process);
         draft.friends[2] = Operation.Update('Charlie-Updated', process);
       });
 
-      // Replace entire array - Alice-Updated moves from index 0 to index 2
       state.mutate((draft) => {
         draft.friends = ['David', 'Eve', 'Alice-Updated', 'Frank'];
       });
 
       expect(state.model.friends).toEqual(['David', 'Eve', 'Alice-Updated', 'Frank']);
 
-      // Value-based tracking: annotations follow values, not indices
-      expect(state.inspect.friends[0].pending()).toBe(false); // David is new, no annotation
-      expect(state.inspect.friends[1].pending()).toBe(false); // Eve is new, no annotation
-      expect(state.inspect.friends[2].pending()).toBe(true); // Alice-Updated keeps its annotation
+      expect(state.inspect.friends[0].pending()).toBe(false);
+      expect(state.inspect.friends[1].pending()).toBe(false);
+      expect(state.inspect.friends[2].pending()).toBe(true);
       expect(state.inspect.friends[2].is(Operation.Update)).toBe(true);
-      expect(state.inspect.friends[3].pending()).toBe(false); // Frank is new, no annotation
+      expect(state.inspect.friends[3].pending()).toBe(false);
     });
 
     /**
@@ -360,34 +408,26 @@ describe('mutate()', () => {
       };
       const state = new State<Model>(initial);
 
-      // Add operations to specific items BEFORE sorting
-      // Zoe at index 0, Alice at index 1, Mike at index 2
       state.mutate((draft) => {
-        draft.friends[0] = Operation.Update('Zoe-Updated', process); // Zoe gets annotation
-        draft.friends[2] = Operation.Update('Mike-Updated', process); // Mike gets annotation
+        draft.friends[0] = Operation.Update('Zoe-Updated', process);
+        draft.friends[2] = Operation.Update('Mike-Updated', process);
       });
 
-      // Sort the array (using Operation.Sort to track it)
       state.mutate((draft) => {
         draft.friends = Operation.Sort([...draft.friends].sort(), process);
       });
 
-      // After sort: ['Alice', 'Mike-Updated', 'Zoe-Updated']
       expect(state.model.friends).toEqual(['Alice', 'Mike-Updated', 'Zoe-Updated']);
 
-      // Now replace the entire array with new values
       state.mutate((draft) => {
         draft.friends = ['Bob', 'Carol', 'Dave'];
       });
 
-      // With value-based tracking, new values get no annotations
       expect(state.model.friends).toEqual(['Bob', 'Carol', 'Dave']);
 
-      // Value-based tracking: Bob, Carol, and Dave are all new values that don't match
-      // any values in the sorted array, so they get no annotations
-      expect(state.inspect.friends[0].pending()).toBe(false); // Bob is new
-      expect(state.inspect.friends[1].pending()).toBe(false); // Carol is new
-      expect(state.inspect.friends[2].pending()).toBe(false); // Dave is new
+      expect(state.inspect.friends[0].pending()).toBe(false);
+      expect(state.inspect.friends[1].pending()).toBe(false);
+      expect(state.inspect.friends[2].pending()).toBe(false);
     });
 
     /**
@@ -413,7 +453,6 @@ describe('mutate()', () => {
         }
       });
 
-      // Add operations to specific people
       state.mutate((draft) => {
         draft.people[0] = Operation.Update({ id: 1, name: 'Alice-Updated' }, process);
         draft.people[2] = Operation.Update({ id: 3, name: 'Charlie-Updated' }, process);
@@ -423,7 +462,6 @@ describe('mutate()', () => {
       expect(state.inspect.people[1].pending()).toBe(false);
       expect(state.inspect.people[2].pending()).toBe(true);
 
-      // Replace array - reorder people
       state.mutate((draft) => {
         draft.people = [
           { id: 2, name: 'Bob' },
@@ -438,11 +476,10 @@ describe('mutate()', () => {
         { id: 1, name: 'Alice-Updated' },
       ]);
 
-      // Annotations follow objects by their ID, not by index
-      expect(state.inspect.people[0].pending()).toBe(false); // Bob (id: 2) has no annotation
-      expect(state.inspect.people[1].pending()).toBe(true); // Charlie-Updated (id: 3) keeps annotation
+      expect(state.inspect.people[0].pending()).toBe(false);
+      expect(state.inspect.people[1].pending()).toBe(true);
       expect(state.inspect.people[1].is(Operation.Update)).toBe(true);
-      expect(state.inspect.people[2].pending()).toBe(true); // Alice-Updated (id: 1) keeps annotation
+      expect(state.inspect.people[2].pending()).toBe(true);
       expect(state.inspect.people[2].is(Operation.Update)).toBe(true);
     });
 
@@ -604,7 +641,6 @@ describe('mutate()', () => {
         ],
       };
 
-      // No identity function provided - falls back to F.equals for structural comparison
       const state = new State<Model>(initial);
       const process = Symbol('process');
 
@@ -614,7 +650,6 @@ describe('mutate()', () => {
 
       expect(state.inspect.people[0].pending()).toBe(true);
 
-      // Replace array with structurally identical object (different reference)
       state.mutate((draft) => {
         draft.people = [
           { id: 1, name: 'Alice-Updated' },
@@ -622,7 +657,6 @@ describe('mutate()', () => {
         ];
       });
 
-      // Annotation IS preserved via F.equals structural comparison
       expect(state.inspect.people[0].pending()).toBe(true);
       expect(state.inspect.people[1].pending()).toBe(false);
     });

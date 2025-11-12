@@ -11,6 +11,7 @@ Operations are particularly useful for async operations and optimistic updates, 
   - [Available operations](#available-operations)
   - [Pruning operations](#pruning-operations)
   - [Listening to changes](#listening-to-changes)
+  - [Passing state to components](#passing-state-to-components)
   - [Value-based tracking](#value-based-tracking)
     - [Arrays](#arrays)
     - [Objects](#objects)
@@ -149,6 +150,30 @@ function useStore<M>(store: State<M>) {
 
   return store;
 }
+```
+
+### Passing state to components
+
+Use `box()` to pass values with their annotations to components:
+
+```tsx
+import type { Box } from 'immertation';
+
+type Props = {
+  count: Box<number>;
+};
+
+function Counter({ count }: Props) {
+  return (
+    <div>
+      <span>{count.model}</span>
+      {count.inspect.pending() && <Spinner />}
+    </div>
+  );
+}
+
+// Usage
+<Counter count={store.inspect.count.box()} />
 ```
 
 ### Value-based tracking

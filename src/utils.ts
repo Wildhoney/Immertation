@@ -1,13 +1,15 @@
 import type {
   Recipe,
-  Annotated,
+  Tree,
   Path,
   Operations,
-  Decorate,
-  Box,
+  Inspectable,
+  Container,
   Process,
   Task,
   Identity,
+  IdentityValueType,
+  Box,
 } from './types';
 import { Node, Annotation, Config, Event, Operation } from './types';
 import type { Objectish, Patch } from 'immer';
@@ -16,36 +18,31 @@ import { A, D, F, G } from '@mobily/ts-belt';
 import clone from 'lodash/cloneDeep';
 import get from 'lodash/get';
 
-const defaultIdentity: Identity<any> = (F as any).ignore;
-
-type IdentityValueType<M> = Exclude<
-  M extends (infer U)[]
-    ? Identity<U> | U
-    : M extends object
-      ? { [K in keyof M]: Identity<M[K]> }[keyof M] | M
-      : never,
-  undefined
->;
+/**
+ * Default identity function that returns undefined for all values.
+ * This causes value comparison to fall back to structural equality using F.equals.
+ */
+const defaultIdentity: Identity = () => undefined;
 
 /**
- * Recursively wraps a model in Node instances to create an annotated structure.
+ * Recursively wraps a model in Node instances to create an annotation tree.
  * Each value in the model is wrapped in a Node containing the value and empty annotations.
  *
- * @template M - The model type to annotate
+ * @template M - The model type to wrap
  * @param model - The model to wrap in Node instances
- * @returns An annotated version of the model with Node wrappers at every level
+ * @returns An annotation tree with Node wrappers at every level
  *
  * @example
  * ```typescript
  * const model = { name: 'John', friends: ['Alice', 'Bob'] };
- * const annotated = annotate(model);
+ * const annotationTree = tree(model);
  * ```
  */
-export function annotate<M>(model: M): Annotated<M> {
-  if (G.isNullable(model)) return new Node(model) as Annotated<M>;
-  if (G.isArray(model)) return new Node(A.map(model, (value) => annotate(value))) as Annotated<M>;
-  if (G.isObject(model)) return new Node(D.map(model, (value) => annotate(value))) as Annotated<M>;
-  return new Node(model) as Annotated<M>;
+export function tree<M>(model: M): Tree<M> {
+  if (G.isNullable(model)) return new Node(model) as Tree<M>;
+  if (G.isArray(model)) return new Node(A.map(model, (value) => tree(value))) as Tree<M>;
+  if (G.isObject(model)) return new Node(D.map(model, (value) => tree(value))) as Tree<M>;
+  return new Node(model) as Tree<M>;
 }
 
 /**
@@ -111,11 +108,11 @@ export function event(operation: Operations): Event | undefined {
  * store.inspect.name.draft() // 'Jane' - value from latest task
  * ```
  */
-export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
+export function inspect<M>(node: Tree<M>, model?: M): Inspectable<M> {
   const actual = G.isNotNullable(model) ? model : (node[Config.separator] as M);
 
-  const handler: ProxyHandler<Box<M>> = {
-    get(target: Box<M>, property: string | symbol): unknown {
+  const handler: ProxyHandler<Container<M>> = {
+    get(target: Container<M>, property: string | symbol): unknown {
       switch (property) {
         case 'pending':
           return (): boolean => A.isNotEmpty(node.annotation.tasks as readonly Task<unknown>[]);
@@ -135,6 +132,11 @@ export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
             const task = A.at(node.annotation.tasks as readonly Task<M>[], -1);
             return G.isNotNullable(task) ? task.state : actual;
           };
+
+        case 'box':
+          return (): Box<M> => {
+            return { model: actual, inspect: inspect(node, actual) };
+          };
       }
 
       if (G.isArray(target.value) && G.isString(property)) {
@@ -148,8 +150,8 @@ export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
             (node[Config.separator] as unknown[])[index] instanceof Node;
 
           return exists
-            ? decorate((node[Config.separator] as unknown[])[index] as Node, value)
-            : decorate(new Node(value), value);
+            ? inspect((node[Config.separator] as unknown[])[index] as Node, value)
+            : inspect(new Node(value), value);
         }
       }
 
@@ -158,17 +160,17 @@ export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
 
         if (G.isObject(node[Config.separator]) && property in (node[Config.separator] as object)) {
           const actual = (node[Config.separator] as Record<string, unknown>)[property];
-          if (actual instanceof Node) return decorate(actual as Annotated<typeof value>, value);
+          if (actual instanceof Node) return inspect(actual as Tree<typeof value>, value);
         }
 
-        return decorate(new Node(value), value);
+        return inspect(new Node(value), value);
       }
 
       return undefined;
     },
   };
 
-  return new Proxy({ value: actual }, handler) as unknown as Decorate<M>;
+  return new Proxy({ value: actual }, handler) as unknown as Inspectable<M>;
 }
 
 /**
@@ -184,29 +186,29 @@ export function decorate<M>(node: Annotated<M>, model?: M): Decorate<M> {
  * const pruned = prune(annotations, process);
  * ```
  */
-export function prune<M>(node: Annotated<M>, process: Process): Annotated<M> {
+export function prune<M>(node: Tree<M>, process: Process): Tree<M> {
   const tasks = node.annotation.tasks.filter((task) => task.process !== process);
   const annotation = Annotation.restore(tasks as Task<M>[]);
 
   if (G.isArray(node[Config.separator])) {
     return new Node(
       A.map(node[Config.separator] as readonly Node<unknown>[], (child) =>
-        child instanceof Node ? prune(child as Annotated<unknown>, process) : child
+        child instanceof Node ? prune(child as Tree<unknown>, process) : child
       ) as M,
       annotation
-    ) as Annotated<M>;
+    ) as Tree<M>;
   }
 
   if (G.isObject(node[Config.separator])) {
     return new Node(
       D.map(node[Config.separator] as Record<string, unknown>, (child) =>
-        child instanceof Node ? prune(child as Annotated<unknown>, process) : child
+        child instanceof Node ? prune(child as Tree<unknown>, process) : child
       ) as M,
       annotation
-    ) as Annotated<M>;
+    ) as Tree<M>;
   }
 
-  return new Node(node[Config.separator], annotation) as Annotated<M>;
+  return new Node(node[Config.separator], annotation) as Tree<M>;
 }
 
 /**
@@ -235,10 +237,10 @@ export function prune<M>(node: Annotated<M>, process: Process): Annotated<M> {
  */
 export function apply<M extends Objectish>(
   model: M,
-  annotations: Annotated<M>,
+  annotations: Tree<M>,
   recipe: Recipe<M>,
   identity: Identity<M> = defaultIdentity as Identity<M>
-): [M, Annotated<M>] {
+): [M, Tree<M>] {
   const [, patches, inversePatches] = Config.immer.produceWithPatches(model, recipe);
 
   return [
@@ -280,13 +282,14 @@ function pathify(path: Path[]): Path[] {
 /**
  * Recursively converts a value to its plain form by unwrapping Annotations.
  *
+ * @template T - The value type
  * @param value - The value to convert
  * @returns The plain value with all Annotations unwrapped
  */
-function deannotate(value: unknown): unknown {
+function deannotate<T>(value: T): T {
   if (value instanceof Annotation) return deannotate(value.state());
-  if (G.isArray(value)) return A.map(value, deannotate);
-  if (G.isObject(value)) return D.map(value, deannotate);
+  if (G.isArray(value)) return A.map(value, deannotate) as T;
+  if (G.isObject(value)) return D.map(value, deannotate) as T;
   return value;
 }
 
@@ -336,7 +339,7 @@ function unwrap(patch: Patch): Patch {
  * ```
  */
 function merge<M>(
-  annotations: Annotated<M>,
+  annotations: Tree<M>,
   patch: Patch,
   inversePatch: Patch,
   identity: Identity<M> = defaultIdentity as Identity<M>

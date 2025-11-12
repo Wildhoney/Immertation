@@ -1,5 +1,5 @@
 import { Immer, enablePatches, immerable } from 'immer';
-import { A, F } from '@mobily/ts-belt';
+import { A } from '@mobily/ts-belt';
 
 /**
  * Configuration for the state management system.
@@ -48,7 +48,20 @@ export type Identity<T = unknown> = [T] extends [never]
       >
     ) => string | number | symbol | undefined | void;
 
-export const defaultIdentity: Identity = (F as any).ignore;
+export const defaultIdentity: Identity = () => undefined;
+
+/**
+ * Helper type for extracting identity value types from a model.
+ * @internal
+ */
+export type IdentityValueType<M> = Exclude<
+  M extends (infer U)[]
+    ? Identity<U> | U
+    : M extends object
+      ? { [K in keyof M]: Identity<M[K]> }[keyof M] | M
+      : never,
+  undefined
+>;
 
 /**
  * A unique identifier for a mutation process.
@@ -319,21 +332,21 @@ export class Operation {
  *
  * @template T - The base type to wrap
  */
-export type Annotated<T> = T extends (infer U)[]
-  ? Node<Annotated<U>[]>
+export type Tree<T> = T extends (infer U)[]
+  ? Node<Tree<U>[]>
   : T extends object
-    ? Node<{ [K in keyof T]: Annotated<T[K]> }>
+    ? Node<{ [K in keyof T]: Tree<T[K]> }>
     : Node<T>;
 
 /**
- * Decorated methods available on annotation proxies for querying operation state.
+ * Annotated methods available on annotation proxies for querying operation state.
  *
  * These methods are dynamically added to all properties in the model structure
  * via the proxy returned by `mutate()` and `prune()`.
  *
  * @template T - The value type being wrapped
  */
-type Decorated<T = unknown> = {
+type Annotated<T = unknown> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
   /** Returns the count of annotation tasks for this property */
@@ -342,6 +355,8 @@ type Decorated<T = unknown> = {
   is(operation: Operations): boolean;
   /** Returns the value from the most recent annotation task, or the current value if no tasks */
   draft(): T;
+  /** Returns a tuple of [value, annotated proxy] for easy prop passing with annotations */
+  box(): Box<T>;
 };
 
 /**
@@ -351,18 +366,47 @@ type Decorated<T = unknown> = {
  * as the original model while adding `pending()`, `is()`, and `draft()` methods
  * to every property at every level of nesting.
  *
- * @template T - The base type to decorate with helper methods
+ * @template M - The base model type to make inspectable
  */
-export type Decorate<T> = T extends (infer U)[]
+export type Inspectable<M> = M extends (infer U)[]
   ? {
-      [K in keyof T]: Decorate<U>;
-    } & Decorated<U>
-  : T extends object
-    ? { [K in keyof T]: Decorate<T[K]> } & Decorated<T>
-    : Decorated<T>;
+      [K in keyof M]: Inspectable<U>;
+    } & Annotated<U>
+  : M extends object
+    ? { [K in keyof M]: Inspectable<M[K]> } & Annotated<M>
+    : Annotated<M>;
 
 /**
- * Internal proxy box that holds the actual model value.
+ * A boxed value containing both the raw value and its annotated proxy.
+ *
+ * This type represents the return value of the `box()` method, making it easy
+ * to pass values with their annotations to components.
+ *
+ * @template T - The value type being boxed
+ *
+ * @example
+ * ```typescript
+ * type Props = {
+ *   count: Box<number>;
+ * };
+ *
+ * function Component({ count }: Props) {
+ *   return (
+ *     <div>
+ *       <span>{count.model}</span>
+ *       {count.inspect.pending() && <Spinner />}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export type Box<T> = {
+  model: T;
+  inspect: Inspectable<T>;
+};
+
+/**
+ * Internal container that holds the actual model value.
  *
  * This type is used internally by the proxy handler to wrap the model in an object,
  * allowing the proxy to work with primitive values as well as objects and arrays.
@@ -370,4 +414,4 @@ export type Decorate<T> = T extends (infer U)[]
  * @template T - The value type being wrapped
  * @internal
  */
-export type Box<T> = { value: T };
+export type Container<T> = { value: T };

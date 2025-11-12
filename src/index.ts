@@ -1,9 +1,12 @@
 import type { Objectish } from 'immer';
-import type { Recipe, Annotated, Process, Identity, Listener, Decorate } from './types';
-import { apply, annotate, decorate, prune as cleanup } from './utils';
-import { F } from '@mobily/ts-belt';
+import type { Recipe, Tree, Process, Identity, Listener, Inspectable } from './types';
+import * as utils from './utils';
 
-const defaultIdentity: Identity<any> = (F as any).ignore;
+/**
+ * Default identity function that returns undefined for all values.
+ * This causes value comparison to fall back to structural equality using F.equals.
+ */
+const defaultIdentity: Identity = () => undefined;
 
 /**
  * Main class for managing immutable state with operation tracking.
@@ -43,7 +46,7 @@ export class State<M extends Objectish> {
    * The annotation tree tracking all operation tasks.
    * @private
    */
-  #annotations: Annotated<M>;
+  #annotations: Tree<M>;
 
   /**
    * Identity function for tracking values through operations.
@@ -78,7 +81,7 @@ export class State<M extends Objectish> {
    */
   constructor(model: M, identity: Identity<M> = defaultIdentity as Identity<M>) {
     this.#model = model;
-    this.#annotations = annotate(model);
+    this.#annotations = utils.tree(model);
     this.#identity = identity;
   }
   /**
@@ -102,10 +105,10 @@ export class State<M extends Objectish> {
    * The inspect proxy provides helper methods for checking operation state
    * on any property path in the model structure. Use `pending()` to check if a property has
    * pending operations, `remaining()` to get the count of pending operations, `is(Operation)`
-   * to check for specific operation types, and `draft()` to get the value from the most recent
-   * annotation record.
+   * to check for specific operation types, `draft()` to get the value from the most recent
+   * annotation task, and `box()` to get an object with `{ model, inspect }` for passing to components.
    *
-   * @returns An inspection proxy providing `pending()`, `remaining()`, `is()`, and `draft()` methods on all properties
+   * @returns An inspection proxy providing `pending()`, `remaining()`, `is()`, `draft()`, and `box()` methods on all properties
    *
    * @example
    * ```typescript
@@ -118,11 +121,15 @@ export class State<M extends Objectish> {
    * console.log(store.inspect.name.pending()); // true - has annotation tasks
    * console.log(store.inspect.name.remaining()); // 1 - number of annotation tasks
    * console.log(store.inspect.name.is(Operation.Update)); // true - has Update operation
-   * console.log(store.inspect.name.draft()); // 'Jane' - value from latest record
+   * console.log(store.inspect.name.draft()); // 'Jane' - value from latest task
+   *
+   * const box = store.inspect.name.box();
+   * console.log(box.model); // 'Jane'
+   * console.log(box.inspect.pending()); // true
    * ```
    */
-  get inspect(): Decorate<M> {
-    return decorate(this.#annotations, this.#model);
+  get inspect(): Inspectable<M> {
+    return utils.inspect(this.#annotations, this.#model);
   }
 
   /**
@@ -154,7 +161,12 @@ export class State<M extends Objectish> {
    * ```
    */
   mutate(recipe: Recipe<M>): void {
-    const [model, annotations] = apply<M>(this.#model, this.#annotations, recipe, this.#identity);
+    const [model, annotations] = utils.apply<M>(
+      this.#model,
+      this.#annotations,
+      recipe,
+      this.#identity
+    );
     this.#model = model;
     this.#annotations = annotations;
     this.#notify();
@@ -184,7 +196,7 @@ export class State<M extends Objectish> {
    * ```
    */
   prune(process: Process): void {
-    this.#annotations = cleanup(this.#annotations, process);
+    this.#annotations = utils.prune(this.#annotations, process);
     this.#notify();
   }
 
@@ -239,4 +251,4 @@ export class State<M extends Objectish> {
 }
 
 export { Operation, Event } from './types';
-export type { Decorate } from './types';
+export type { Inspectable, Box } from './types';
