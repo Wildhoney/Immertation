@@ -23,16 +23,16 @@ const defaultIdentity: Identity = () => undefined;
  * @example
  * ```typescript
  * type Model = { name: string; age: number };
- * const store = new State<Model>({ name: 'John', age: 30 });
+ * const state = new State<Model>({ name: 'John', age: 30 });
  *
  * const process = Symbol('update');
- * store.mutate((draft) => {
+ * state.mutate((draft) => {
  *   draft.name = Operation.Update('Jane', process);
  * });
  *
- * console.log(store.model.name); // 'Jane'
- * console.log(store.inspect.name.pending()); // true - has annotation tasks
- * console.log(store.inspect.name.is(Operation.Update)); // true - has Update operation
+ * console.log(state.model.name); // 'Jane'
+ * console.log(state.inspect.name.pending()); // true - has annotation tasks
+ * console.log(state.inspect.name.is(Operation.Update)); // true - has Update operation
  * ```
  */
 export class State<M extends Objectish> {
@@ -91,8 +91,8 @@ export class State<M extends Objectish> {
    *
    * @example
    * ```typescript
-   * const store = new State({ name: 'John', age: 30 });
-   * console.log(store.model.name); // 'John'
+   * const state = new State({ name: 'John', age: 30 });
+   * console.log(state.model.name); // 'John'
    * ```
    */
   get model(): M {
@@ -113,17 +113,17 @@ export class State<M extends Objectish> {
    * @example
    * ```typescript
    * const process = Symbol('update');
-   * store.mutate((draft) => {
+   * state.mutate((draft) => {
    *   draft.name = Operation.Update('Jane', process);
    * });
    *
-   * console.log(store.model.name); // 'Jane'
-   * console.log(store.inspect.name.pending()); // true - has annotation tasks
-   * console.log(store.inspect.name.remaining()); // 1 - number of annotation tasks
-   * console.log(store.inspect.name.is(Operation.Update)); // true - has Update operation
-   * console.log(store.inspect.name.draft()); // 'Jane' - value from latest task
+   * console.log(state.model.name); // 'Jane'
+   * console.log(state.inspect.name.pending()); // true - has annotation tasks
+   * console.log(state.inspect.name.remaining()); // 1 - number of annotation tasks
+   * console.log(state.inspect.name.is(Operation.Update)); // true - has Update operation
+   * console.log(state.inspect.name.draft()); // 'Jane' - value from latest task
    *
-   * const box = store.inspect.name.box();
+   * const box = state.inspect.name.box();
    * console.log(box.model); // 'Jane'
    * console.log(box.inspect.pending()); // true
    * ```
@@ -144,20 +144,20 @@ export class State<M extends Objectish> {
    * @example
    * ```typescript
    * // Simple mutation
-   * store.mutate((draft) => {
+   * state.mutate((draft) => {
    *   draft.name = 'Jane';
    * });
    *
    * // With operation tracking
    * const process = Symbol('update');
-   * store.mutate((draft) => {
+   * state.mutate((draft) => {
    *   draft.name = Operation.Update('Jane', process);
    * });
    *
-   * console.log(store.model.name); // 'Jane'
-   * console.log(store.inspect.name.pending()); // true - has annotation tasks
-   * console.log(store.inspect.name.is(Operation.Update)); // true - has Update operation
-   * console.log(store.inspect.name.draft()); // 'Jane' - value from latest record
+   * console.log(state.model.name); // 'Jane'
+   * console.log(state.inspect.name.pending()); // true - has annotation tasks
+   * console.log(state.inspect.name.is(Operation.Update)); // true - has Update operation
+   * console.log(state.inspect.name.draft()); // 'Jane' - value from latest record
    * ```
    */
   mutate(recipe: Recipe<M>): void {
@@ -186,13 +186,13 @@ export class State<M extends Objectish> {
    * @example
    * ```typescript
    * const process = Symbol('update');
-   * store.mutate((draft) => {
+   * state.mutate((draft) => {
    *   draft.name = Operation.Update('Jane', process);
    * });
    *
-   * store.prune(process);
-   * console.log(store.inspect.name.pending()); // false - annotation was removed
-   * console.log(store.model.name); // 'Jane' - model unchanged
+   * state.prune(process);
+   * console.log(state.inspect.name.pending()); // false - annotation was removed
+   * console.log(state.model.name); // 'Jane' - model unchanged
    * ```
    */
   prune(process: Process): void {
@@ -212,13 +212,13 @@ export class State<M extends Objectish> {
    *
    * @example
    * ```typescript
-   * const store = new State({ count: 0 });
+   * const state = new State({ count: 0 });
    *
-   * const unsubscribe = store.listen((state) => {
+   * const unsubscribe = state.listen((state) => {
    *   console.log('Count changed:', state.model.count);
    * });
    *
-   * store.mutate((draft) => {
+   * state.mutate((draft) => {
    *   draft.count = 1;
    * }); // Logs: "Count changed: 1"
    *
@@ -231,7 +231,7 @@ export class State<M extends Objectish> {
    * const [, forceUpdate] = useReducer((x) => x + 1, 0);
    *
    * useEffect(() => {
-   *   const unsubscribe = store.listen(() => forceUpdate());
+   *   const unsubscribe = state.listen(() => forceUpdate());
    *   return unsubscribe;
    * }, []);
    * ```

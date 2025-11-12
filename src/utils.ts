@@ -98,14 +98,14 @@ export function event(operation: Operations): Event | undefined {
  *
  * @example
  * ```typescript
- * store.mutate((draft) => {
+ * state.mutate((draft) => {
  *   draft.name = Operation.Update('Jane', process);
  * });
  *
- * store.inspect.name.pending() // true - has annotation tasks
- * store.inspect.name.remaining() // 1 - number of annotation tasks
- * store.inspect.name.is(Operation.Update) // true - has Update operation
- * store.inspect.name.draft() // 'Jane' - value from latest task
+ * state.inspect.name.pending() // true - has annotation tasks
+ * state.inspect.name.remaining() // 1 - number of annotation tasks
+ * state.inspect.name.is(Operation.Update) // true - has Update operation
+ * state.inspect.name.draft() // 'Jane' - value from latest task
  * ```
  */
 export function inspect<M>(node: Tree<M>, model?: M): Inspectable<M> {

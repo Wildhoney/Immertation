@@ -28,24 +28,24 @@ type Model = {
 };
 
 // Create an instance with initial data
-const store = new State<Model>({
+const state = new State<Model>({
   name: 'John',
   age: 30
 });
 
 // Mutate the model
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.name = 'Jane';
   draft.age = 31;
 });
 
 // Access values from the model
-console.log(store.model.name); // 'Jane'
-console.log(store.model.age);  // 31
+console.log(state.model.name); // 'Jane'
+console.log(state.model.age);  // 31
 
 // Check operation state from annotations using inspect
-console.log(store.inspect.name.pending()); // false - no operations tracked
-console.log(store.inspect.age.pending());  // false
+console.log(state.inspect.name.pending()); // false - no operations tracked
+console.log(state.inspect.age.pending());  // false
 ```
 
 ### Using operations
@@ -55,24 +55,24 @@ Operations allow you to track pending changes with annotations. This is especial
 ```typescript
 const process = Symbol('update-user');
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.name = Operation.Update('Jane', process);
   draft.age = Operation.Update(31, process);
 });
 
 // Model contains the updated values
-console.log(store.model.name); // 'Jane'
-console.log(store.model.age);  // 31
+console.log(state.model.name); // 'Jane'
+console.log(state.model.age);  // 31
 
 // Inspect provides helper methods to check operation state
-console.log(store.inspect.name.pending()); // true - has pending operations
-console.log(store.inspect.name.remaining()); // 1 - count of pending operations
-console.log(store.inspect.name.is(Operation.Update)); // true
-console.log(store.inspect.name.is(Operation.Add));    // false
+console.log(state.inspect.name.pending()); // true - has pending operations
+console.log(state.inspect.name.remaining()); // 1 - count of pending operations
+console.log(state.inspect.name.is(Operation.Update)); // true
+console.log(state.inspect.name.is(Operation.Add));    // false
 
 // Get the draft value from the most recent annotation
-console.log(store.inspect.name.draft()); // 'Jane'
-console.log(store.inspect.age.draft());  // 31
+console.log(state.inspect.name.draft()); // 'Jane'
+console.log(state.inspect.age.draft());  // 31
 ```
 
 ### Available operations
@@ -92,28 +92,28 @@ Remove operation records by process. This is useful when async operations comple
 const process1 = Symbol('process1');
 const process2 = Symbol('process2');
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.name = Operation.Update('Alice', process1);
 });
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.age = Operation.Update(25, process2);
 });
 
 // Remove all operations from process1
-store.prune(process1);
+state.prune(process1);
 
 // Model is unchanged (pruning only affects annotations)
-console.log(store.model.name); // 'Alice'
-console.log(store.model.age);  // 25
+console.log(state.model.name); // 'Alice'
+console.log(state.model.age);  // 25
 
 // Annotations from process1 are removed
-console.log(store.inspect.name.pending()); // false - was pruned
-console.log(store.inspect.name.is(Operation.Update)); // false
+console.log(state.inspect.name.pending()); // false - was pruned
+console.log(state.inspect.name.is(Operation.Update)); // false
 
 // Annotations from process2 remain
-console.log(store.inspect.age.pending()); // true
-console.log(store.inspect.age.is(Operation.Update));  // true
+console.log(state.inspect.age.pending()); // true
+console.log(state.inspect.age.is(Operation.Update));  // true
 ```
 
 ### Listening to changes
@@ -121,15 +121,15 @@ console.log(store.inspect.age.is(Operation.Update));  // true
 Register listeners to be notified whenever the model or annotations change. This is particularly useful for integrating with reactive frameworks like React:
 
 ```typescript
-const store = new State({ count: 0 });
+const state = new State({ count: 0 });
 
 // Register a listener
-const unsubscribe = store.listen((state) => {
+const unsubscribe = state.listen((state) => {
   console.log('Count changed:', state.model.count);
   console.log('Has pending operations:', state.inspect.count.pending());
 });
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.count = 1;
 }); // Logs: "Count changed: 1"
 
@@ -140,15 +140,15 @@ unsubscribe();
 **React integration example:**
 
 ```typescript
-function useStore<M>(store: State<M>) {
+function useState<M>(state: State<M>) {
   const [, forceUpdate] = useReducer((x) => x + 1, 0);
 
   useEffect(() => {
-    const unsubscribe = store.listen(() => forceUpdate());
+    const unsubscribe = state.listen(() => forceUpdate());
     return unsubscribe;
-  }, [store]);
+  }, [state]);
 
-  return store;
+  return state;
 }
 ```
 
@@ -173,7 +173,7 @@ function Counter({ count }: Props) {
 }
 
 // Usage
-<Counter count={store.inspect.count.box()} />
+<Counter count={state.inspect.count.box()} />
 ```
 
 ### Value-based tracking
@@ -183,10 +183,10 @@ Annotations follow values, not positions. When values match by identity, annotat
 #### Arrays
 
 ```typescript
-const store = new State({ friends: ['Alice', 'Bob', 'Charlie'] });
+const state = new State({ friends: ['Alice', 'Bob', 'Charlie'] });
 const process = Symbol('update');
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.friends[0] = Operation.Update('Alice-Updated', process);
   draft.friends.sort(); // Annotation follows 'Alice-Updated' to its new position
 });
@@ -195,9 +195,9 @@ store.mutate((draft) => {
 For object arrays, provide an identity function:
 
 ```typescript
-const store = new State(
+const state = new State(
   { people: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] },
-  (value) => (value as Person).id  // Track by id
+  (person) => person.id  // Track by id
 );
 ```
 
@@ -206,12 +206,12 @@ const store = new State(
 Annotations survive object replacements when values match:
 
 ```typescript
-const store = new State({ user: { name: 'Alice', age: 30 } });
+const state = new State({ user: { name: 'Alice', age: 30 } });
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.user.name = Operation.Update('Alice', process);
 });
 
-store.mutate((draft) => {
+state.mutate((draft) => {
   draft.user = { name: 'Alice', age: 31 };  // 'Alice' annotation preserved
 });
