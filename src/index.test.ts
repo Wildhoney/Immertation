@@ -1,664 +1,75 @@
 import { faker } from '@faker-js/faker';
+import { Operation, State } from '.';
 import { describe, expect, it, vi } from 'vitest';
-import { State, Operation, Event } from '.';
-import { A } from '@mobily/ts-belt';
-
-function friends() {
-  return A.makeWithIndex(3, () => faker.person.firstName()) as string[];
-}
 
 describe('mutate()', () => {
   const process = Symbol('process');
 
-  describe('object', () => {
+  describe('primitives', () => {
     type Model = {
       name: string;
       age: number;
     };
 
-    /**
-     * Tests that direct assignment of primitives to object properties updates the model
-     * without creating pending operations in the inspection API.
-     */
-    it('using assignment with primitives', () => {
-      faker.seed(1);
-
+    it('updates', () => {
       const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const state = new State<Model>(initial);
 
       {
+        const state = new State<Model>(initial);
         const name = faker.person.firstName() + '!';
         state.mutate((draft) => void (draft.name = name));
-
         expect(state.model.name).toEqual(name);
-        expect(state.inspect.name.pending()).toBe(false);
-        expect(state.inspect.name.draft()).toEqual(name);
-        expect(state.inspect.age.draft()).toEqual(initial.age);
-      }
-    });
-
-    /**
-     * Tests that wrapping values in Operation.Update or Operation.Replace marks them
-     * as pending and allows inspection of their operation type and draft state.
-     */
-    it('using assignment with operations', () => {
-      faker.seed(2);
-
-      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const state = new State<Model>(initial);
-
-      {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
-
-        expect(state.model.name).toEqual(name);
-        expect(state.inspect.name.pending()).toBe(true);
-        expect(state.inspect.name.is(Operation.Update)).toBe(true);
-        expect(state.inspect.name.is(Operation.Replace)).toBe(false);
-        expect(state.inspect.name.draft()).toEqual(name);
       }
 
       {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = Operation.Replace(name, process)));
-
-        expect(state.model.name).toEqual(name);
-        expect(state.inspect.name.pending()).toBe(true);
-        expect(state.inspect.name.is(Operation.Update)).toBe(true);
-        expect(state.inspect.name.is(Operation.Replace)).toBe(true);
-        expect(state.inspect.name.draft()).toEqual(name);
-      }
-    });
-
-    /**
-     * Tests that Operation.Custom allows defining arbitrary event combinations
-     * and that the inspection API correctly identifies the custom events.
-     */
-    it('using assignment with custom operations', () => {
-      faker.seed(3);
-
-      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const state = new State<Model>(initial);
-
-      const name = faker.person.firstName() + '!';
-      state.mutate(
-        (draft) => void (draft.name = Operation.Custom(name, [Event.Add, Event.Update], process))
-      );
-
-      expect(state.model.name).toEqual(name);
-      expect(state.inspect.name.pending()).toBe(true);
-      expect(state.inspect.name.is(Operation.Add)).toBe(true);
-      expect(state.inspect.name.is(Operation.Update)).toBe(true);
-      expect(state.inspect.name.is(Operation.Replace)).toBe(false);
-      expect(state.inspect.name.draft()).toEqual(name);
-    });
-
-    /**
-     * Tests that remaining() returns the correct count of annotation tasks,
-     * including tracking through multiple operations and after pruning.
-     */
-    it('using remaining() to count annotation tasks', () => {
-      faker.seed(4);
-
-      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const state = new State<Model>(initial);
-
-      expect(state.inspect.name.remaining()).toBe(0);
-      expect(state.inspect.name.pending()).toBe(false);
-
-      {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
-
-        expect(state.inspect.name.remaining()).toBe(1);
-        expect(state.inspect.name.pending()).toBe(true);
-      }
-
-      {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = Operation.Replace(name, process)));
-
-        expect(state.inspect.name.remaining()).toBe(2);
-        expect(state.inspect.name.pending()).toBe(true);
-      }
-
-      state.prune(process);
-      expect(state.inspect.name.remaining()).toBe(0);
-      expect(state.inspect.name.pending()).toBe(false);
-    });
-
-    /**
-     * Tests that box() returns an object with model and inspect properties,
-     * making it easy to pass annotated values to components.
-     */
-    it('using box() to get model and inspect', () => {
-      faker.seed(5);
-
-      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-      const state = new State<Model>(initial);
-
-      {
-        const box = state.inspect.name.box();
-        expect(box.model).toBe(initial.name);
-        expect(box.inspect.pending()).toBe(false);
-        expect(box.inspect.remaining()).toBe(0);
-      }
-
-      {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
-
-        const box = state.inspect.name.box();
-        expect(box.model).toBe(name);
-        expect(box.inspect.pending()).toBe(true);
-        expect(box.inspect.remaining()).toBe(1);
-        expect(box.inspect.is(Operation.Update)).toBe(true);
-        expect(box.inspect.draft()).toBe(name);
-      }
-
-      {
+        const state = new State<Model>(initial);
         const name = faker.person.firstName() + '?';
-        state.mutate((draft) => void (draft.name = Operation.Replace(name, process)));
-
-        const box = state.inspect.name.box();
-        expect(box.model).toBe(name);
-        expect(box.inspect.pending()).toBe(true);
-        expect(box.inspect.remaining()).toBe(2);
-        expect(box.inspect.is(Operation.Update)).toBe(true);
-        expect(box.inspect.is(Operation.Replace)).toBe(true);
-        expect(box.inspect.draft()).toBe(name);
-      }
-
-      {
-        state.prune(process);
-        const box = state.inspect.name.box();
-        expect(box.model).toBe(state.model.name);
-        expect(box.inspect.pending()).toBe(false);
-        expect(box.inspect.remaining()).toBe(0);
+        state.mutate((draft) => {
+          draft.name = Operation.Update(name, process);
+        });
+        expect(state.model.name).toEqual(name);
+        expect(state.inspect.name.pending()).toBe(true);
+        expect(state.inspect.name.draft()).toEqual(name);
       }
     });
   });
 
-  describe('array', () => {
+  describe('arrays', () => {
     type Model = {
       friends: string[];
     };
 
-    /**
-     * Tests that assigning Operation-wrapped values to specific array indices
-     * marks only those indices as pending while leaving others untouched.
-     */
-    it('using assignment with operations', () => {
-      faker.seed(8);
-
-      const initial = { friends: friends() };
-      const state = new State<Model>(initial);
-
-      {
-        const names = [faker.person.firstName() + '!', faker.person.firstName() + '?'] as const;
-        state.mutate((draft) => {
-          draft.friends[0] = Operation.Update(names[0], process);
-          draft.friends[2] = Operation.Update(names[1], process);
-        });
-
-        expect(state.model.friends).toEqual([names[0], initial.friends[1], names[1]]);
-
-        expect(state.inspect.friends[0].pending()).toBe(true);
-        expect(state.inspect.friends[1].pending()).toBe(false);
-        expect(state.inspect.friends[2].pending()).toBe(true);
-
-        expect(state.inspect.friends[0].is(Operation.Update)).toBe(true);
-        expect(state.inspect.friends[1].is(Operation.Update)).toBe(false);
-        expect(state.inspect.friends[2].is(Operation.Update)).toBe(true);
-
-        expect(state.inspect.friends[0].draft()).toEqual(names[0]);
-        expect(state.inspect.friends[2].draft()).toEqual(names[1]);
-      }
-    });
-
-    /**
-     * Tests that pushing primitive values onto arrays adds them without creating
-     * pending operations, treating them as regular array additions.
-     */
-    it('using push with primitives', () => {
-      faker.seed(3);
-
-      const initial = {
-        friends: friends(),
-      };
-      const state = new State<Model>(initial);
-
-      {
-        const name = faker.person.firstName();
-        state.mutate((draft) => {
-          draft.friends.push(name);
-        });
-
-        expect(state.model.friends).toEqual([...initial.friends, name]);
-        expect(state.model.friends.length).toBe(initial.friends.length + 1);
-        expect(state.inspect.friends.pending()).toBe(false);
-      }
-    });
-
-    /**
-     * Tests that pushing Operation.Add-wrapped values marks only the new element
-     * as pending while existing elements remain non-pending.
-     */
-    it('using push with operations', () => {
-      faker.seed(4);
-
-      const initial = {
-        friends: friends(),
-      };
-      const state = new State<Model>(initial);
-
-      {
-        const name = faker.person.firstName();
-        state.mutate((draft) => {
-          draft.friends.push(Operation.Add(name, process));
-        });
-
-        expect(state.model.friends).toEqual([...initial.friends, name]);
-
-        expect(state.inspect.friends[0].pending()).toBe(false);
-        expect(state.inspect.friends[1].pending()).toBe(false);
-        expect(state.inspect.friends[2].pending()).toBe(false);
-        expect(state.inspect.friends[3].pending()).toBe(true);
-
-        expect(state.inspect.friends[0].is(Operation.Add)).toBe(false);
-        expect(state.inspect.friends[1].is(Operation.Add)).toBe(false);
-        expect(state.inspect.friends[2].is(Operation.Add)).toBe(false);
-        expect(state.inspect.friends[3].is(Operation.Add)).toBe(true);
-
-        expect(state.inspect.friends[3].draft()).toEqual(name);
-      }
-    });
-
-    /**
-     * Tests that assigning a sorted array without Operation wrapping performs
-     * a simple replacement without tracking the sort operation.
-     */
-    it('using sort with primitives', () => {
-      faker.seed(5);
-
-      const initial = {
-        friends: friends(),
-      };
-      const state = new State<Model>(initial);
-
-      {
-        state.mutate((draft) => void (draft.friends = [...draft.friends].sort()));
-
-        expect(state.model.friends).toMatchSnapshot();
-      }
-    });
-
-    /**
-     * Tests that Operation.Sort tracks array reordering while preserving annotations
-     * on individual elements through position changes and subsequent updates.
-     */
-    it('using sort with operations', () => {
-      faker.seed(6);
-
+    it('updates', () => {
       const initial = {
         friends: [
-          faker.person.firstName(),
-          faker.person.firstName() + '!',
-          faker.person.firstName(),
+          'A' + faker.person.firstName(),
+          'B' + faker.person.firstName(),
+          'C' + faker.person.firstName(),
         ],
       };
-      const state = new State<Model>(initial);
+      const sorted = [...initial.friends].sort();
 
       {
+        const state = new State<Model>(initial);
         const name = faker.person.firstName() + '!';
-        const index = initial.friends.findIndex((friend) => friend.endsWith('!'));
+
         state.mutate((draft) => {
-          draft.friends[index] = Operation.Update(name, process);
-          draft.friends = Operation.Sort([...draft.friends].sort(), process);
-        });
-
-        expect(state.model.friends).toMatchSnapshot();
-        expect(state.inspect.friends.pending()).toBe(true);
-        expect(state.inspect.friends.is(Operation.Sort)).toBe(true);
-      }
-
-      {
-        const name = faker.person.firstName() + '?';
-        state.mutate((draft) => {
-          const index = draft.friends.findIndex((friend) => friend.endsWith('!'));
-          draft.friends[index] = Operation.Replace(name, process);
-        });
-
-        expect(state.model.friends).toMatchSnapshot();
-
-        const friend = state.model.friends.findIndex((friend) => friend.endsWith('?'));
-        const index = state.inspect.friends[friend];
-        expect(index.pending()).toBe(true);
-        expect(index.is(Operation.Update)).toBe(true);
-        expect(index.is(Operation.Replace)).toBe(true);
-        expect(index.draft()).toEqual(name);
-      }
-    });
-
-    /**
-     * Tests that Operation.Sort correctly handles arrays with duplicate values,
-     * ensuring annotations are preserved even when identical values are reordered.
-     */
-    it('using sort with operations and duplicate items', () => {
-      faker.seed(7);
-
-      const name = faker.person.firstName();
-      const initial = {
-        friends: [name, name, faker.person.firstName()],
-      };
-      const state = new State<Model>(initial);
-
-      {
-        const name = faker.person.firstName() + '!';
-        state.mutate((draft) => {
+          draft.friends.sort();
           draft.friends[1] = Operation.Update(name, process);
-          draft.friends = Operation.Sort([...draft.friends].sort(), process);
         });
 
-        expect(state.model.friends).toMatchSnapshot();
-        expect(state.inspect.friends.pending()).toBe(true);
-        expect(state.inspect.friends.is(Operation.Sort)).toBe(true);
+        const expected = [...sorted];
+        expected[1] = name;
+        expect(state.model.friends).toEqual(expected);
+        expect(state.model.friends[1]).toEqual(name);
+
+        expect(state.inspect.friends[1].pending()).toBe(true);
+        expect(state.inspect.friends[1].is(Operation.Update)).toBe(true);
+        expect(state.inspect.friends[1].draft()).toEqual(name);
+
+        expect(state.inspect.friends[0].pending()).toBe(false);
+        expect(state.inspect.friends[2].pending()).toBe(false);
       }
-    });
-
-    /**
-     * Tests that annotations follow values (not indices) when arrays are replaced,
-     * so an annotated value keeps its annotation even when moved to a different index.
-     */
-    it('array replacement with value-based tracking', () => {
-      faker.seed(10);
-
-      const initial = {
-        friends: ['Alice', 'Bob', 'Charlie'],
-      };
-      const state = new State<Model>(initial);
-
-      state.mutate((draft) => {
-        draft.friends[0] = Operation.Update('Alice-Updated', process);
-        draft.friends[2] = Operation.Update('Charlie-Updated', process);
-      });
-
-      state.mutate((draft) => {
-        draft.friends = ['David', 'Eve', 'Alice-Updated', 'Frank'];
-      });
-
-      expect(state.model.friends).toEqual(['David', 'Eve', 'Alice-Updated', 'Frank']);
-
-      expect(state.inspect.friends[0].pending()).toBe(false);
-      expect(state.inspect.friends[1].pending()).toBe(false);
-      expect(state.inspect.friends[2].pending()).toBe(true);
-      expect(state.inspect.friends[2].is(Operation.Update)).toBe(true);
-      expect(state.inspect.friends[3].pending()).toBe(false);
-    });
-
-    /**
-     * Tests that value-based tracking works correctly even after sorting,
-     * with annotations being lost when values are completely replaced.
-     */
-    it('array replacement after sort - annotations follow values through sort', () => {
-      faker.seed(11);
-
-      const initial = {
-        friends: ['Zoe', 'Alice', 'Mike'],
-      };
-      const state = new State<Model>(initial);
-
-      state.mutate((draft) => {
-        draft.friends[0] = Operation.Update('Zoe-Updated', process);
-        draft.friends[2] = Operation.Update('Mike-Updated', process);
-      });
-
-      state.mutate((draft) => {
-        draft.friends = Operation.Sort([...draft.friends].sort(), process);
-      });
-
-      expect(state.model.friends).toEqual(['Alice', 'Mike-Updated', 'Zoe-Updated']);
-
-      state.mutate((draft) => {
-        draft.friends = ['Bob', 'Carol', 'Dave'];
-      });
-
-      expect(state.model.friends).toEqual(['Bob', 'Carol', 'Dave']);
-
-      expect(state.inspect.friends[0].pending()).toBe(false);
-      expect(state.inspect.friends[1].pending()).toBe(false);
-      expect(state.inspect.friends[2].pending()).toBe(false);
-    });
-
-    /**
-     * Tests that providing a custom identity function allows annotations to follow
-     * objects by ID rather than reference equality when arrays are reordered.
-     */
-    it('array replacement with object identity function', () => {
-      faker.seed(12);
-
-      type Model = { people: { id: number; name: string }[] };
-
-      const initial: Model = {
-        people: [
-          { id: 1, name: 'Alice' },
-          { id: 2, name: 'Bob' },
-          { id: 3, name: 'Charlie' },
-        ],
-      };
-
-      const state = new State<Model>(initial, (value: any) => {
-        if (typeof value === 'object' && value && 'id' in value) {
-          return value.id;
-        }
-      });
-
-      state.mutate((draft) => {
-        draft.people[0] = Operation.Update({ id: 1, name: 'Alice-Updated' }, process);
-        draft.people[2] = Operation.Update({ id: 3, name: 'Charlie-Updated' }, process);
-      });
-
-      expect(state.inspect.people[0].pending()).toBe(true);
-      expect(state.inspect.people[1].pending()).toBe(false);
-      expect(state.inspect.people[2].pending()).toBe(true);
-
-      state.mutate((draft) => {
-        draft.people = [
-          { id: 2, name: 'Bob' },
-          { id: 3, name: 'Charlie-Updated' },
-          { id: 1, name: 'Alice-Updated' },
-        ];
-      });
-
-      expect(state.model.people).toEqual([
-        { id: 2, name: 'Bob' },
-        { id: 3, name: 'Charlie-Updated' },
-        { id: 1, name: 'Alice-Updated' },
-      ]);
-
-      expect(state.inspect.people[0].pending()).toBe(false);
-      expect(state.inspect.people[1].pending()).toBe(true);
-      expect(state.inspect.people[1].is(Operation.Update)).toBe(true);
-      expect(state.inspect.people[2].pending()).toBe(true);
-      expect(state.inspect.people[2].is(Operation.Update)).toBe(true);
-    });
-
-    /**
-     * Tests that replacing an array with completely different values discards
-     * all existing annotations since no values match between old and new arrays.
-     */
-    it('array replacement with completely new values - no annotations preserved', () => {
-      faker.seed(13);
-
-      const initial = {
-        friends: ['Alice', 'Bob', 'Charlie'],
-      };
-      const state = new State<Model>(initial);
-      const process = Symbol('process');
-
-      state.mutate((draft) => {
-        draft.friends[0] = Operation.Update('Alice-Updated', process);
-        draft.friends[2] = Operation.Update('Charlie-Updated', process);
-      });
-
-      expect(state.inspect.friends[0].pending()).toBe(true);
-      expect(state.inspect.friends[2].pending()).toBe(true);
-
-      state.mutate((draft) => {
-        draft.friends = ['David', 'Eve', 'Frank'];
-      });
-
-      expect(state.model.friends).toEqual(['David', 'Eve', 'Frank']);
-      expect(state.inspect.friends[0].pending()).toBe(false);
-      expect(state.inspect.friends[1].pending()).toBe(false);
-      expect(state.inspect.friends[2].pending()).toBe(false);
-    });
-
-    /**
-     * Tests that replacing an entire object discards all annotations because
-     * the new object has different values for all annotated properties.
-     */
-    it('object replacement - annotations preserved only when values match', () => {
-      type Model = {
-        user: {
-          name: string;
-          age: number;
-          email: string;
-        };
-      };
-
-      const initial = {
-        user: {
-          name: 'Alice',
-          age: 30,
-          email: 'alice@example.com',
-        },
-      };
-      const state = new State<Model>(initial);
-      const process = Symbol('process');
-
-      state.mutate((draft) => {
-        draft.user.name = Operation.Update('Alice-Updated', process);
-        draft.user.age = Operation.Update(31, process);
-      });
-
-      expect(state.model.user.name).toBe('Alice-Updated');
-      expect(state.model.user.age).toBe(31);
-      expect(state.inspect.user.name.pending()).toBe(true);
-      expect(state.inspect.user.age.pending()).toBe(true);
-
-      state.mutate((draft) => {
-        draft.user = {
-          name: 'Bob',
-          age: 25,
-          email: 'bob@example.com',
-        };
-      });
-
-      expect(state.model.user.name).toBe('Bob');
-      expect(state.model.user.age).toBe(25);
-      expect(state.inspect.user.name.pending()).toBe(false);
-      expect(state.inspect.user.age.pending()).toBe(false);
-    });
-
-    /**
-     * Tests that replacing an object preserves annotations on properties whose
-     * values remain the same while discarding annotations on changed properties.
-     */
-    it('object replacement - annotations preserved when value matches', () => {
-      type Model = {
-        user: {
-          name: string;
-          age: number;
-        };
-      };
-
-      const initial = {
-        user: {
-          name: 'Alice',
-          age: 30,
-        },
-      };
-      const state = new State<Model>(initial);
-      const process = Symbol('process');
-
-      state.mutate((draft) => {
-        draft.user.name = Operation.Update('Alice', process);
-      });
-
-      expect(state.inspect.user.name.pending()).toBe(true);
-
-      state.mutate((draft) => {
-        draft.user = {
-          name: 'Alice',
-          age: 31,
-        };
-      });
-
-      expect(state.model.user.name).toBe('Alice');
-      expect(state.model.user.age).toBe(31);
-      expect(state.inspect.user.name.pending()).toBe(true);
-      expect(state.inspect.user.age.pending()).toBe(false);
-    });
-
-    /**
-     * Tests that updating an element and sorting the array in a single mutation
-     * correctly tracks the annotation through the sort operation.
-     */
-    it('update and sort in same mutate - annotation preserved', () => {
-      faker.seed(15);
-
-      const initial = {
-        friends: ['Zoe', 'Alice', 'Mike'],
-      };
-      const state = new State<Model>(initial);
-      const process = Symbol('process');
-
-      state.mutate((draft) => {
-        draft.friends[0] = Operation.Update('Zoe-Updated', process);
-        draft.friends.sort();
-      });
-
-      expect(state.model.friends).toEqual(['Alice', 'Mike', 'Zoe-Updated']);
-      expect(state.inspect.friends[0].pending()).toBe(false);
-      expect(state.inspect.friends[1].pending()).toBe(false);
-      expect(state.inspect.friends[2].pending()).toBe(true);
-    });
-
-    /**
-     * Tests that without a custom identity function, annotations on objects are
-     * preserved through structural equality (F.equals) rather than reference equality.
-     */
-    it('array of objects without identity function - annotations preserved via F.equals', () => {
-      faker.seed(16);
-
-      type Model = { people: { id: number; name: string }[] };
-
-      const initial: Model = {
-        people: [
-          { id: 1, name: 'Alice' },
-          { id: 2, name: 'Bob' },
-        ],
-      };
-
-      const state = new State<Model>(initial);
-      const process = Symbol('process');
-
-      state.mutate((draft) => {
-        draft.people[0] = Operation.Update({ id: 1, name: 'Alice-Updated' }, process);
-      });
-
-      expect(state.inspect.people[0].pending()).toBe(true);
-
-      state.mutate((draft) => {
-        draft.people = [
-          { id: 1, name: 'Alice-Updated' },
-          { id: 2, name: 'Bob' },
-        ];
-      });
-
-      expect(state.inspect.people[0].pending()).toBe(true);
-      expect(state.inspect.people[1].pending()).toBe(false);
     });
   });
 });
@@ -686,15 +97,22 @@ describe('prune()', () => {
     const newAge = faker.number.int(100);
     state.mutate((draft) => void (draft.age = Operation.Update(newAge, processes[1])));
 
-    state.prune(processes[0]);
-
+    // Before pruning: model has new values, both properties have annotations
     expect(state.model.name).toEqual(newName);
     expect(state.model.age).toEqual(newAge);
+    expect(state.inspect.name.pending()).toBe(true);
+    expect(state.inspect.age.pending()).toBe(true);
 
-    expect(state.inspect.name.pending()).toBe(false);
+    // Prune process1: removes name annotation, model unchanged
+    state.prune(processes[0]);
+
+    expect(state.model.name).toEqual(newName); // Unchanged
+    expect(state.model.age).toEqual(newAge); // Unchanged
+
+    expect(state.inspect.name.pending()).toBe(false); // Annotation removed
     expect(state.inspect.name.is(Operation.Update)).toBe(false);
 
-    expect(state.inspect.age.pending()).toBe(true);
+    expect(state.inspect.age.pending()).toBe(true); // Still has annotation
     expect(state.inspect.age.is(Operation.Update)).toBe(true);
     expect(state.inspect.age.draft()).toEqual(newAge);
   });

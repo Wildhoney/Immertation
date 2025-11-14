@@ -1,12 +1,13 @@
 import type { Objectish } from 'immer';
-import type { Recipe, Tree, Process, Identity, Listener, Inspectable } from './types';
+import {
+  type Recipe,
+  type Process,
+  type Listener,
+  type Inspectable,
+  type Annotated,
+  Config,
+} from './types';
 import * as utils from './utils';
-
-/**
- * Default identity function that returns undefined for all values.
- * This causes value comparison to fall back to structural equality using F.equals.
- */
-const defaultIdentity: Identity = () => undefined;
 
 /**
  * Main class for managing immutable state with operation tracking.
@@ -46,13 +47,13 @@ export class State<M extends Objectish> {
    * The annotation tree tracking all operation tasks.
    * @private
    */
-  #annotations: Tree<M>;
+  #annotations: Annotated<M>;
 
   /**
    * Identity function for tracking values through operations.
    * @private
    */
-  #identity: Identity<M>;
+  // #identity: Identity<M>;
 
   /**
    * Set of listener functions to call when state changes.
@@ -79,10 +80,9 @@ export class State<M extends Objectish> {
    * );
    * ```
    */
-  constructor(model: M, identity: Identity<M> = defaultIdentity as Identity<M>) {
+  constructor(model: M) {
     this.#model = model;
-    this.#annotations = utils.tree(model);
-    this.#identity = identity;
+    this.#annotations = model as Annotated<M>;
   }
   /**
    * Gets the current model state.
@@ -161,14 +161,19 @@ export class State<M extends Objectish> {
    * ```
    */
   mutate(recipe: Recipe<M>): void {
-    const [model, annotations] = utils.apply<M>(
-      this.#model,
-      this.#annotations,
-      recipe,
-      this.#identity
+    const analysis = utils.analyse(this.#model, this.#annotations, recipe);
+
+    // Restore model patches by removing Annotation values (keeps model unchanged for Operations)
+    const restored = utils.restore(analysis.model.patches, analysis.model.inversePatches);
+    this.#model = Config.immer.applyPatches(this.#model, restored);
+
+    // Consolidate annotation patches to merge annotations properly
+    const consolidated = utils.consolidate(
+      analysis.annotations.patches,
+      analysis.annotations.inversePatches
     );
-    this.#model = model;
-    this.#annotations = annotations;
+    this.#annotations = Config.immer.applyPatches(this.#annotations, consolidated);
+
     this.#notify();
   }
 
@@ -196,7 +201,9 @@ export class State<M extends Objectish> {
    * ```
    */
   prune(process: Process): void {
-    this.#annotations = utils.prune(this.#annotations, process);
+    const [model, annotations] = utils.prune(this.#model, this.#annotations, process);
+    this.#model = model;
+    this.#annotations = annotations;
     this.#notify();
   }
 
@@ -251,4 +258,4 @@ export class State<M extends Objectish> {
 }
 
 export { Operation, Event } from './types';
-export type { Inspectable, Box } from './types';
+export type { Inspectable, Box, Annotated } from './types';

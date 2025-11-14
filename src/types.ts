@@ -1,4 +1,4 @@
-import { Immer, enablePatches, immerable } from 'immer';
+import { Immer, enablePatches, immerable, type Patch } from 'immer';
 import { A } from '@mobily/ts-belt';
 
 /**
@@ -9,6 +9,11 @@ export class Config {
    * The property name used to access the current value in Node instances.
    */
   static separator = 'current' as const;
+
+  /**
+   * A unique symbol representing a void value.
+   */
+  static void = Symbol('void');
 
   /**
    * The Immer instance used for producing and applying patches.
@@ -27,6 +32,25 @@ export class Config {
  * @template M - The model type
  */
 export type Recipe<M> = (draft: M) => void;
+
+/**
+ * A readonly array of Immer patches.
+ */
+export type Patches = readonly Patch[];
+
+/**
+ * Result of analyzing a recipe, containing patches for both model and annotations.
+ */
+export type Analysis = {
+  model: {
+    patches: Patches;
+    inversePatches: Patches;
+  };
+  annotations: {
+    patches: Patches;
+    inversePatches: Patches;
+  };
+};
 
 /**
  * A function that returns a unique identifier for a value.
@@ -255,8 +279,8 @@ export class Operation {
    * @param process - The process identifier
    * @returns The annotated value
    */
-  static Remove<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Remove], process) as T;
+  static Remove<T>(process: Process): T {
+    return Annotation.create(Config.void, [Event.Remove], process) as T;
   }
 
   /**
@@ -327,26 +351,44 @@ export class Operation {
   }
 }
 
-/**
- * Recursively wraps a type in Node instances.
- *
- * @template T - The base type to wrap
- */
-export type Tree<T> = T extends (infer U)[]
-  ? Node<Tree<U>[]>
-  : T extends object
-    ? Node<{ [K in keyof T]: Tree<T[K]> }>
-    : Node<T>;
+export type Property = string | symbol;
 
 /**
- * Annotated methods available on annotation proxies for querying operation state.
+ * Recursively transforms a type so that each value can be either its original type or an Annotation.
+ *
+ * This type represents the structure of the annotations tree, where at any level:
+ * - Primitives can be `T` or `Annotation<T>`
+ * - Objects can have annotated properties or be an `Annotation<T>` of the whole object
+ * - Arrays can have annotated elements or be an `Annotation<T>` of the whole array
+ *
+ * @template T - The base type to make annotatable
+ *
+ * @example
+ * ```typescript
+ * type Model = { name: string; friends: string[] };
+ * type AnnotatedModel = Annotated<Model>;
+ * // Results in:
+ * // {
+ * //   name: string | Annotation<string>;
+ * //   friends: (string | Annotation<string>)[] | Annotation<string[]>;
+ * // } | Annotation<Model>
+ * ```
+ */
+export type Annotated<T> = T extends (infer U)[]
+  ? Annotated<U>[] | Annotation<T>
+  : T extends object
+    ? { [K in keyof T]: Annotated<T[K]> } | Annotation<T>
+    : T | Annotation<T>;
+
+/**
+ * Annotation methods available on inspection proxies for querying operation state.
  *
  * These methods are dynamically added to all properties in the model structure
- * via the proxy returned by `mutate()` and `prune()`.
+ * via the proxy returned by the `inspect` getter.
  *
  * @template T - The value type being wrapped
  */
-type Annotated<T = unknown> = {
+type AnnotationMethods<T = unknown> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
   /** Returns the count of annotation tasks for this property */
@@ -371,10 +413,10 @@ type Annotated<T = unknown> = {
 export type Inspectable<M> = M extends (infer U)[]
   ? {
       [K in keyof M]: Inspectable<U>;
-    } & Annotated<U>
+    } & AnnotationMethods<U>
   : M extends object
-    ? { [K in keyof M]: Inspectable<M[K]> } & Annotated<M>
-    : Annotated<M>;
+    ? { [K in keyof M]: Inspectable<M[K]> } & AnnotationMethods<M>
+    : AnnotationMethods<M>;
 
 /**
  * A boxed value containing both the raw value and its annotated proxy.

@@ -26,7 +26,7 @@ export default function People() {
     store.mutate((draft) => {
       const index = draft.people.findIndex((p) => p.id === id);
       if (index !== -1) {
-        draft.people[index] = Operation.Remove(draft.people[index], process);
+        draft.people[index] = Operation.Remove(process);
       }
     });
 
