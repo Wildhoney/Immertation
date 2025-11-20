@@ -15,7 +15,10 @@ describe('mutate()', () => {
      */
     it('updates', () => {
       {
-        const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+        const initial = {
+          name: faker.person.firstName(),
+          age: faker.number.int(100),
+        };
         const state = new State<Model>(initial, (item) => String(item));
         const name = faker.person.firstName() + '!';
         const process = state.mutate((draft) => {
@@ -29,7 +32,10 @@ describe('mutate()', () => {
       }
 
       {
-        const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+        const initial = {
+          name: faker.person.firstName(),
+          age: faker.number.int(100),
+        };
         const state = new State<Model>(initial, (item) => String(item));
         const name = faker.person.firstName() + '?';
         const age = faker.number.int(100);

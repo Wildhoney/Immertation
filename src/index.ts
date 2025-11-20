@@ -31,7 +31,7 @@ export class State<M extends Objectish> {
 
   mutate(recipe: Recipe<M>): Process {
     const process = Symbol('process');
-    const result = utils.reconcile(this.#model, recipe, this.#registry, this.#identity, process);
+    const result = utils.reconcile(this.#model, this.#registry, process, recipe, this.#identity);
     this.#model = result;
     this.#notify();
     return process;

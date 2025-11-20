@@ -4,6 +4,11 @@ import { Immer, type Patch, enablePatches, type Objectish, current, isDraft } fr
 export type { Objectish };
 
 /**
+ * A record with string keys and unknown values.
+ */
+export type Object = Record<string, unknown>;
+
+/**
  * Configuration class for internal library settings.
  *
  * @remarks
@@ -15,12 +20,6 @@ export class Config {
     enablePatches();
     return new Immer();
   })();
-
-  /** Converts a draft proxy to a plain object */
-  static current = current;
-
-  /** Checks if a value is an Immer draft proxy */
-  static isDraft = isDraft;
 }
 
 /**
@@ -83,13 +82,13 @@ export type ExtractObjectish<M> = M extends object
  * const identity = (value: any) => String(value);
  * ```
  */
-export type Identity<T = any> = (value: T) => string;
+export type Identity<T = unknown> = (value: T) => string;
 
 /**
  * An identifier that uniquely identifies a value in the model.
  * Uses the identity function result as the stable key.
  */
-export type Identifier = string;
+export type Id = string;
 
 /**
  * Stores patches for a specific process.
@@ -102,7 +101,7 @@ export type PatchSet = {
 /**
  * A registry mapping identity keys to their annotations.
  */
-export type Registry = Map<Identifier, Annotation<any>>;
+export type Registry = Map<Id, Annotation<unknown>>;
 
 /**
  * A registry of patches for each process.
@@ -207,22 +206,23 @@ export class Annotation<T> {
   }
 
   /**
-   * Restores an annotation from a filtered set of tasks.
-   *
-   * This is primarily used for pruning operations where tasks need to be filtered
-   * by process and restored into a new annotation instance.
+   * Removes tasks associated with a specific process from this annotation.
    *
    * @template T - The value type
-   * @param tasks - The tasks to restore
-   * @returns A new annotation with the provided tasks
+   * @param process - The process identifier whose tasks should be removed
+   * @returns A new annotation with tasks filtered to exclude the specified process, or null if no tasks remain
    *
    * @example
    * ```typescript
-   * const filtered = annotation.tasks.filter(task => task.process !== processToRemove);
-   * const restored = Annotation.restore(filtered);
+   * const prunedAnnotation = annotation.prune(processToRemove);
+   * if (prunedAnnotation === null) {
+   *   // All tasks were removed
+   * }
    * ```
    */
-  static prune<T>(tasks: Task<T>[]): Annotation<T> {
+  prune(process: Process): Annotation<T> | null {
+    const tasks = this.tasks.filter((task) => task.process !== process);
+    if (A.length(tasks) === 0) return null;
     const annotation = new Annotation<T>();
     annotation.tasks = tasks;
     return annotation;
@@ -280,7 +280,7 @@ export type Property = string | number | null;
  *
  * @template T - The value type being wrapped
  */
-type Inspectors<T = any> = {
+type Inspectors<T = unknown> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
   /** Returns the count of annotation tasks for this property */
