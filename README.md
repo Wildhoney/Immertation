@@ -1,6 +1,18 @@
-# Immertation
+<p align="center">
+  <img src="media/logo.png" alt="Immertation" width="33%" />
+</p>
 
-A state management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.
+<p align="center">
+  <a href="https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml">
+    <img src="https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml/badge.svg" alt="Checks">
+  </a>
+</p>
+
+<p align="center">
+  🧶 <a href="https://wildhoney.github.io/Immertation">View Live Demo →</a>
+</p>
+
+> State management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.
 
 Operations are particularly useful for async operations and optimistic updates, where the model is being operated on but not yet committed to the final value. This allows you to track pending changes and distinguish between the current committed state and the draft state with pending operations.
 
@@ -21,31 +33,187 @@ Operations are particularly useful for async operations and optimistic updates, 
 ```typescript
 import { State, Operation } from 'immertation';
 
-// Define your model type
 type Model = {
   name: string;
   age: number;
 };
 
-// Create an instance with initial data
 const state = new State<Model>({
   name: 'John',
   age: 30
 });
 
-// Mutate the model
 state.mutate((draft) => {
   draft.name = 'Jane';
   draft.age = 31;
 });
 
-// Access values from the model
-console.log(state.model.name); // 'Jane'
-console.log(state.model.age);  // 31
+console.log(state.model.name);
+console.log(state.model.age);
 
-// Check operation state from annotations using inspect
-console.log(state.inspect.name.pending()); // false - no operations tracked
-console.log(state.inspect.age.pending());  // false
+console.log(state.inspect.name.pending());
+console.log(state.inspect.age.pending());
+```
+
+## Complete Example: User Management with Async Operations
+
+Here's a real-world example showing how to manage a list of users with optimistic updates:
+
+```tsx
+import { State, Draft, Op } from 'immertation';
+import { useEffect, useReducer, useMemo } from 'react';
+
+type User = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+type Model = {
+  users: User[];
+};
+
+const state = new State<Model>(
+  { users: [] },
+  (value) => {
+    if ('id' in value) return `user/${value.id}`;
+    return String(value);
+  }
+);
+
+function useAppState<M>(state: State<M>) {
+  const forceUpdate = useReducer((x) => x + 1, 0)[1];
+
+  useEffect(() => {
+    return state.observe(() => forceUpdate());
+  }, [state]);
+
+  return state;
+}
+
+function useUserController(state: State<Model>) {
+  const updateUser = async (id: number, updates: Partial<User>) => {
+    const process = state.mutate((draft) => {
+      const user = draft.users.find((user) => user.id === id);
+      if (user && updates.name) {
+        user.name = Draft(updates.name, Op.Update);
+      }
+    });
+
+    try {
+      await fetch(`/api/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+
+      state.mutate((draft) => {
+        const user = draft.users.find((user) => user.id === id);
+        if (user && updates.name) user.name = updates.name;
+      });
+      state.prune(process);
+    } catch (error) {
+      const originalUser = state.model.users.find((user) => user.id === id);
+      state.mutate((draft) => {
+        const user = draft.users.find((user) => user.id === id);
+        if (user && originalUser) user.name = originalUser.name;
+      });
+      state.prune(process);
+    }
+  };
+
+  const deleteUser = async (id: number) => {
+    const process = state.mutate((draft) => {
+      const index = draft.users.findIndex((user) => user.id === id);
+      if (index !== -1) {
+        draft.users[index].email = Draft(draft.users[index].email, Op.Remove);
+      }
+    });
+
+    try {
+      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+
+      state.mutate((draft) => {
+        const index = draft.users.findIndex((user) => user.id === id);
+        if (index !== -1) draft.users.splice(index, 1);
+      });
+      state.prune(process);
+    } catch (error) {
+      state.prune(process);
+    }
+  };
+
+  const createUser = async (user: Omit<User, 'id'>) => {
+    const tempUser: User = { id: Date.now(), ...user };
+
+    const process = state.mutate((draft) => {
+      draft.users.push(Draft(tempUser, Op.Add));
+    });
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        body: JSON.stringify(user),
+      });
+      const created = await response.json();
+
+      state.mutate((draft) => {
+        const index = draft.users.findIndex((user) => user.id === tempUser.id);
+        if (index !== -1) draft.users[index] = created;
+      });
+      state.prune(process);
+    } catch (error) {
+      state.mutate((draft) => {
+        const index = draft.users.findIndex((user) => user.id === tempUser.id);
+        if (index !== -1) draft.users.splice(index, 1);
+      });
+      state.prune(process);
+    }
+  };
+
+  return { updateUser, deleteUser, createUser };
+}
+
+function UserList() {
+  const state = useAppState(appState);
+  const { updateUser, deleteUser, createUser } = useUserController(state);
+
+  return (
+    <div>
+      {state.inspect.users.draft().map((user, index) => {
+        const annotations = state.inspect.users[index];
+        const isDeleting = annotations.email.is(Op.Remove);
+        const isCreating = annotations.pending();
+        const isUpdating = annotations.name.is(Op.Update);
+
+        return (
+          <div key={user.id}>
+            <span style={{ opacity: isDeleting ? 0.5 : 1 }}>
+              {user.name}
+              {isCreating && ' (Creating...)'}
+              {isUpdating && ' (Updating...)'}
+              {isDeleting && ' (Deleting...)'}
+            </span>
+            <button
+              onClick={() => updateUser(user.id, { name: 'New Name' })}
+              disabled={isCreating || isUpdating}
+            >
+              Update
+            </button>
+            <button
+              onClick={() => deleteUser(user.id)}
+              disabled={isCreating || isDeleting}
+            >
+              Delete
+            </button>
+          </div>
+        );
+      })}
+      <button onClick={() => createUser({ name: 'New User', email: 'new@example.com' })}>
+        Add User
+      </button>
+    </div>
+  );
+}
 ```
 
 ### Using operations
@@ -60,19 +228,16 @@ state.mutate((draft) => {
   draft.age = Operation.Update(31, process);
 });
 
-// Model contains the updated values
-console.log(state.model.name); // 'Jane'
-console.log(state.model.age);  // 31
+console.log(state.model.name);
+console.log(state.model.age);
 
-// Inspect provides helper methods to check operation state
-console.log(state.inspect.name.pending()); // true - has pending operations
-console.log(state.inspect.name.remaining()); // 1 - count of pending operations
-console.log(state.inspect.name.is(Operation.Update)); // true
-console.log(state.inspect.name.is(Operation.Add));    // false
+console.log(state.inspect.name.pending());
+console.log(state.inspect.name.remaining());
+console.log(state.inspect.name.is(Operation.Update));
+console.log(state.inspect.name.is(Operation.Add));
 
-// Get the draft value from the most recent annotation
-console.log(state.inspect.name.draft()); // 'Jane'
-console.log(state.inspect.age.draft());  // 31
+console.log(state.inspect.name.draft());
+console.log(state.inspect.age.draft());
 ```
 
 ### Available operations
@@ -100,20 +265,16 @@ state.mutate((draft) => {
   draft.age = Operation.Update(25, process2);
 });
 
-// Remove all operations from process1
 state.prune(process1);
 
-// Model is unchanged (pruning only affects annotations)
-console.log(state.model.name); // 'Alice'
-console.log(state.model.age);  // 25
+console.log(state.model.name);
+console.log(state.model.age);
 
-// Annotations from process1 are removed
-console.log(state.inspect.name.pending()); // false - was pruned
-console.log(state.inspect.name.is(Operation.Update)); // false
+console.log(state.inspect.name.pending());
+console.log(state.inspect.name.is(Operation.Update));
 
-// Annotations from process2 remain
-console.log(state.inspect.age.pending()); // true
-console.log(state.inspect.age.is(Operation.Update));  // true
+console.log(state.inspect.age.pending());
+console.log(state.inspect.age.is(Operation.Update));
 ```
 
 ### Listening to changes
@@ -123,7 +284,6 @@ Register listeners to be notified whenever the model or annotations change. This
 ```typescript
 const state = new State({ count: 0 });
 
-// Register a listener
 const unsubscribe = state.listen((state) => {
   console.log('Count changed:', state.model.count);
   console.log('Has pending operations:', state.inspect.count.pending());
@@ -131,9 +291,8 @@ const unsubscribe = state.listen((state) => {
 
 state.mutate((draft) => {
   draft.count = 1;
-}); // Logs: "Count changed: 1"
+});
 
-// Clean up when done
 unsubscribe();
 ```
 
@@ -172,7 +331,6 @@ function Counter({ count }: Props) {
   );
 }
 
-// Usage
 <Counter count={state.inspect.count.box()} />
 ```
 
@@ -188,7 +346,7 @@ const process = Symbol('update');
 
 state.mutate((draft) => {
   draft.friends[0] = Operation.Update('Alice-Updated', process);
-  draft.friends.sort(); // Annotation follows 'Alice-Updated' to its new position
+  draft.friends.sort();
 });
 ```
 
@@ -197,7 +355,7 @@ For object arrays, provide an identity function:
 ```typescript
 const state = new State(
   { people: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] },
-  (person) => person.id  // Track by id
+  (person) => person.id
 );
 ```
 
@@ -213,5 +371,29 @@ state.mutate((draft) => {
 });
 
 state.mutate((draft) => {
-  draft.user = { name: 'Alice', age: 31 };  // 'Alice' annotation preserved
+  draft.user = { name: 'Alice', age: 31 };
 });
+```
+
+## Implementation
+
+### Core Algorithm
+
+The library uses Immer's `produceWithPatches` to track state changes. When mutations occur with `Draft()` annotations:
+
+1. **Iterate over patches**: Loop through all patches generated by Immer
+2. **Clone and apply**: For each patch, clone the model and apply patches up to that point
+3. **Find annotations**: Recursively search for `Annotation` instances in `patch.value`
+4. **Replace with current values**: Replace annotations with actual values from the cloned model at that path
+5. **Store in registry**: Use the identity function to generate a unique key and store the annotation in the registry
+
+### Identity Function
+
+The identity function (`(item) => item?.id ? \`person/\${item.id}\` : undefined`) provides stable keys for tracking values across mutations, similar to React keys. This allows the library to match annotations to current model values even when arrays are sorted or filtered.
+
+### Inspection
+
+The `inspect` proxy uses the identity function to look up annotations in the registry:
+- `pending()`: Returns true if an annotation exists for this value
+- `draft()`: Returns the draft value from the annotation
+- `is(Op)`: Checks if the annotation contains a specific operation type

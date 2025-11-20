@@ -1,91 +1,113 @@
-import { Immer, enablePatches, immerable, type Patch } from 'immer';
 import { A } from '@mobily/ts-belt';
+import { Immer, type Patch, enablePatches, type Objectish, current, isDraft } from 'immer';
+
+export type { Objectish };
 
 /**
- * Configuration for the state management system.
+ * Configuration class for internal library settings.
+ *
+ * @remarks
+ * Holds the Immer instance used for producing patches and tracking state changes.
  */
 export class Config {
-  /**
-   * The property name used to access the current value in Node instances.
-   */
-  static separator = 'current' as const;
-
-  /**
-   * A unique symbol representing a void value.
-   */
-  static void = Symbol('void');
-
-  /**
-   * The Immer instance used for producing and applying patches.
-   */
-  static get immer() {
-    const immer = new Immer();
+  /** Immer instance used for patch-based state tracking */
+  static immer = (() => {
     enablePatches();
-    immer.setAutoFreeze(false);
-    return immer;
-  }
+    return new Immer();
+  })();
+
+  /** Converts a draft proxy to a plain object */
+  static current = current;
+
+  /** Checks if a value is an Immer draft proxy */
+  static isDraft = isDraft;
 }
 
 /**
  * A function that mutates a draft of the model.
  *
- * @template M - The model type
+ * @template M - The model type (must be an object or array)
  */
-export type Recipe<M> = (draft: M) => void;
+export type Recipe<M extends Objectish> = (draft: M) => void;
 
 /**
- * A readonly array of Immer patches.
+ * Helper type that extracts object types from a value, handling arrays and nested objects.
+ * Includes both the array itself and the items within it.
  */
-export type Patches = readonly Patch[];
+type ExtractFromValue<T> = T extends (infer U)[]
+  ? U extends object
+    ? T | U | ExtractObjectish<U>
+    : never
+  : T extends object
+    ? T | ExtractObjectish<T>
+    : never;
 
 /**
- * Result of analyzing a recipe, containing patches for both model and annotations.
+ * Recursively extracts all Objectish types from a model type.
+ * This creates a union of all objects and arrays within the model structure.
+ * If no nested objects are found, returns the model itself.
+ *
+ * @template M - The model type to extract Objectish types from
  */
-export type Analysis = {
-  model: {
-    patches: Patches;
-    inversePatches: Patches;
-  };
-  annotations: {
-    patches: Patches;
-    inversePatches: Patches;
-  };
+export type ExtractObjectish<M> = M extends object
+  ? {
+      [K in keyof M]: ExtractFromValue<M[K]>;
+    }[keyof M] extends never
+    ? M
+    : {
+        [K in keyof M]: ExtractFromValue<M[K]>;
+      }[keyof M]
+  : never;
+
+/**
+ * A function that returns a unique string identifier for a value, similar to React keys.
+ * Used to track values and match annotations to current model state.
+ *
+ * The identity function must handle both objects and arrays. The developer decides
+ * what makes each unique.
+ *
+ * @template T - The union of all Objectish types from the model
+ * @returns A unique string key
+ *
+ * @example
+ * ```typescript
+ * // Handle both objects and arrays:
+ * const identity = (value: any) => {
+ *   if (Array.isArray(value)) {
+ *     return `friends/${value.map(item => item.id).join(',')}`;
+ *   }
+ *   return `friend/${value.id}`;
+ * };
+ *
+ * // For simple values:
+ * const identity = (value: any) => String(value);
+ * ```
+ */
+export type Identity<T = any> = (value: T) => string;
+
+/**
+ * An identifier that uniquely identifies a value in the model.
+ * Uses the identity function result as the stable key.
+ */
+export type Identifier = string;
+
+/**
+ * Stores patches for a specific process.
+ */
+export type PatchSet = {
+  process: Process;
+  patches: Patch[];
 };
 
 /**
- * A function that returns a unique identifier for a value.
- * Used to track values through array operations (sort, reorder, replacement).
- *
- * @template T - The value type
- * @returns A unique identifier (string, number, or symbol), or undefined/void to fall back to F.equals
+ * A registry mapping identity keys to their annotations.
  */
-export type Identity<T = unknown> = [T] extends [never]
-  ? (value: unknown) => string | number | symbol | undefined | void
-  : (
-      value: Exclude<
-        T extends (infer U)[]
-          ? Identity<U> | U
-          : T extends object
-            ? { [K in keyof T]: Identity<T[K]> }[keyof T] | T
-            : never,
-        undefined
-      >
-    ) => string | number | symbol | undefined | void;
-
-export const defaultIdentity: Identity = () => undefined;
+export type Registry = Map<Identifier, Annotation<any>>;
 
 /**
- * Helper type for extracting identity value types from a model.
- * @internal
+ * A registry of patches for each process.
  */
-export type IdentityValueType<M> = Exclude<
-  M extends (infer U)[]
-    ? Identity<U> | U
-    : M extends object
-      ? { [K in keyof M]: Identity<M[K]> }[keyof M] | M
-      : never,
-  undefined
->;
+export type PatchRegistry = Map<Process, PatchSet>;
 
 /**
  * A unique identifier for a mutation process.
@@ -93,28 +115,36 @@ export type IdentityValueType<M> = Exclude<
 export type Process = symbol;
 
 /**
- * A listener function that is called when state changes.
+ * An observer function that is called when state changes.
  *
  * @template T - The state type
  */
-export type Listener<T> = (state: T) => void;
+export type Observer<T> = (state: T) => void;
 
 /**
- * Operation events that can be applied to values.
+ * A set of observer functions.
+ *
+ * @template T - The state type
  */
-export enum Event {
+export type Observers<T> = Set<Observer<T>>;
+
+/**
+ * Op kinds that can be applied to values.
+ * Uses bitwise flags so multiple operations can be combined.
+ */
+export enum Op {
   /** Value was added */
-  Add,
+  Add = 1,
   /** Value was removed */
-  Remove,
+  Remove = 2,
   /** Value was updated */
-  Update,
+  Update = 4,
   /** Value was moved */
-  Move,
+  Move = 8,
   /** Value was replaced */
-  Replace,
+  Replace = 16,
   /** Value was sorted */
-  Sort,
+  Sort = 32,
 }
 
 /**
@@ -123,18 +153,11 @@ export enum Event {
  * @template T - The value type
  */
 export type Task<T> = {
-  /** The value at this point */
-  state: T;
-  /** The operations applied */
-  operations: Event[];
-  /** The process that created this record */
+  value: T;
+  property: Property;
+  state: Op[];
   process: Process;
 };
-
-/**
- * A path segment for navigating nested structures.
- */
-export type Path = string | number | symbol;
 
 /**
  * Tracks changes to a value through a series of tasks.
@@ -151,22 +174,21 @@ export class Annotation<T> {
    * @template T - The value type
    * @returns An empty annotation
    */
-  static empty<T>() {
-    return new Annotation<T>();
-  }
 
   /**
    * Creates an annotation with a single task.
    *
    * @template T - The value type
-   * @param value - The value
+   * @param current - The current value
+   * @param next - The next value for the operation
    * @param operations - The operations applied
    * @param process - The process identifier
+   * @param property - The property name/index if this was a property assignment
    * @returns A new annotation with the task
    */
-  static create<T>(value: T, operations: Event[], process: Process) {
+  static new<T>(value: T, state: Op[], process: Process, property: Property = null) {
     const annotation = new Annotation<T>();
-    annotation.tasks = [{ state: value, operations, process }];
+    annotation.tasks = [{ value, property, state, process }];
     return annotation;
   }
 
@@ -200,201 +222,71 @@ export class Annotation<T> {
    * const restored = Annotation.restore(filtered);
    * ```
    */
-  static restore<T>(tasks: Task<T>[]): Annotation<T> {
+  static prune<T>(tasks: Task<T>[]): Annotation<T> {
     const annotation = new Annotation<T>();
     annotation.tasks = tasks;
     return annotation;
   }
-
-  /**
-   * Gets the value from the most recent task.
-   *
-   * This is used internally when unwrapping Annotation instances during patch operations.
-   *
-   * @returns The value from the last task, or undefined if no tasks exist
-   */
-  state(): T | undefined {
-    const task = A.last(this.tasks);
-    return task?.state;
-  }
 }
 
 /**
- * A node that wraps a value with its annotations.
- */
-export class Node<T = unknown> {
-  [immerable] = true;
-
-  /**
-   * Creates a new Node instance.
-   *
-   * @param current - The current value stored in this node
-   * @param annotation - The annotation tracking operations on this value (defaults to empty)
-   */
-  constructor(
-    public current: T,
-    public annotation: Annotation<T> = Annotation.empty<T>()
-  ) {}
-}
-
-/**
- * Union type of all operation types.
- */
-export type Operations =
-  | typeof Operation.Add
-  | typeof Operation.Remove
-  | typeof Operation.Update
-  | typeof Operation.Move
-  | typeof Operation.Replace
-  | typeof Operation.Sort
-  | typeof Operation.Custom;
-
-/**
- * Factory for creating annotated values with operation markers.
+ * Creates an annotated draft value with the specified state operations.
+ *
+ * @template T - The value type
+ * @param value - The value to annotate
+ * @param op - Bitwise combination of Op enum values
+ * @returns The annotated value
  *
  * @example
  * ```typescript
- * const process = Symbol('update');
- * draft.name = Operation.Update('Jane', process);
+ * // Single operation
+ * Draft(name, Op.Update)
+ *
+ * // Multiple operations using bitwise OR
+ * Draft(name, Op.Update | Op.Replace)
  * ```
  */
-export class Operation {
-  /**
-   * Marks a value as added.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Add<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Add], process) as T;
-  }
+export function Draft<T>(value: T, op: number): T {
+  const ops = [
+    op & Op.Add ? Op.Add : null,
+    op & Op.Remove ? Op.Remove : null,
+    op & Op.Update ? Op.Update : null,
+    op & Op.Move ? Op.Move : null,
+    op & Op.Replace ? Op.Replace : null,
+    op & Op.Sort ? Op.Sort : null,
+  ].filter((o): o is Op => o !== null);
 
-  /**
-   * Marks a value as removed.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Remove<T>(process: Process): T {
-    return Annotation.create(Config.void, [Event.Remove], process) as T;
-  }
+  // Convert Immer draft proxies to plain objects to avoid revoked proxy errors
+  const rawValue = isDraft(value) ? current(value) : value;
 
-  /**
-   * Marks a value as updated.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Update<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Update], process) as T;
-  }
-
-  /**
-   * Marks a value as moved.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Move<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Move], process) as T;
-  }
-
-  /**
-   * Marks a value as replaced (combines Update and Replace events).
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Replace<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Replace], process) as T;
-  }
-
-  /**
-   * Marks a value as sorted.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param process - The process identifier
-   * @returns The annotated value
-   */
-  static Sort<T>(value: T, process: Process): T {
-    return Annotation.create(value, [Event.Sort], process) as T;
-  }
-
-  /**
-   * Marks a value with custom operation events.
-   *
-   * @template T - The value type
-   * @param value - The value to mark
-   * @param operations - The array of operation events to apply
-   * @param process - The process identifier
-   * @returns The annotated value
-   *
-   * @example
-   * ```typescript
-   * const process = Symbol('custom');
-   * draft.item = Operation.Custom(newValue, [Event.Update, Event.Move], process);
-   * ```
-   */
-  static Custom<T>(value: T, operations: Event[], process: Process): T {
-    return Annotation.create(value, operations, process) as T;
-  }
+  return Annotation.new(rawValue, ops, null as unknown as Process) as T;
 }
 
-export type Property = string | symbol;
-
 /**
- * Recursively transforms a type so that each value can be either its original type or an Annotation.
+ * A property key that can be a string (object property), number (array index), or null (no property).
  *
- * This type represents the structure of the annotations tree, where at any level:
- * - Primitives can be `T` or `Annotation<T>`
- * - Objects can have annotated properties or be an `Annotation<T>` of the whole object
- * - Arrays can have annotated elements or be an `Annotation<T>` of the whole array
- *
- * @template T - The base type to make annotatable
- *
- * @example
- * ```typescript
- * type Model = { name: string; friends: string[] };
- * type AnnotatedModel = Annotated<Model>;
- * // Results in:
- * // {
- * //   name: string | Annotation<string>;
- * //   friends: (string | Annotation<string>)[] | Annotation<string[]>;
- * // } | Annotation<Model>
- * ```
+ * @remarks
+ * - `string`: represents an object property key
+ * - `number`: represents an array index
+ * - `null`: represents no property association (root level)
  */
-export type Annotated<T> = T extends (infer U)[]
-  ? Annotated<U>[] | Annotation<T>
-  : T extends object
-    ? { [K in keyof T]: Annotated<T[K]> } | Annotation<T>
-    : T | Annotation<T>;
+export type Property = string | number | null;
 
 /**
- * Annotation methods available on inspection proxies for querying operation state.
+ * Inspection methods available on proxies for querying operation state.
  *
  * These methods are dynamically added to all properties in the model structure
  * via the proxy returned by the `inspect` getter.
  *
  * @template T - The value type being wrapped
  */
-type AnnotationMethods<T = unknown> = {
+type Inspectors<T = any> = {
   /** Returns true if this property has any pending annotation tasks */
   pending: () => boolean;
   /** Returns the count of annotation tasks for this property */
   remaining: () => number;
   /** Checks if this property has a specific operation type in its annotation tasks */
-  is(operation: Operations): boolean;
+  is(op: Op): boolean;
   /** Returns the value from the most recent annotation task, or the current value if no tasks */
   draft(): T;
   /** Returns a tuple of [value, annotated proxy] for easy prop passing with annotations */
@@ -413,10 +305,10 @@ type AnnotationMethods<T = unknown> = {
 export type Inspectable<M> = M extends (infer U)[]
   ? {
       [K in keyof M]: Inspectable<U>;
-    } & AnnotationMethods<U>
+    } & Inspectors<M>
   : M extends object
-    ? { [K in keyof M]: Inspectable<M[K]> } & AnnotationMethods<M>
-    : AnnotationMethods<M>;
+    ? { [K in keyof M]: Inspectable<M[K]> } & Inspectors<M>
+    : Inspectors<M>;
 
 /**
  * A boxed value containing both the raw value and its annotated proxy.
@@ -448,12 +340,29 @@ export type Box<T> = {
 };
 
 /**
- * Internal container that holds the actual model value.
+ * Example type representing a person entity used in tests and examples.
  *
- * This type is used internally by the proxy handler to wrap the model in an object,
- * allowing the proxy to work with primitive values as well as objects and arrays.
- *
- * @template T - The value type being wrapped
- * @internal
+ * @remarks
+ * This type is exported for use in examples and tests to demonstrate
+ * the library's functionality with a concrete data structure.
  */
-export type Container<T> = { value: T };
+export type Person = {
+  /** Unique identifier for the person */
+  id: symbol;
+  /** Person's name */
+  name: string;
+  /** Person's age */
+  age: number;
+};
+
+/**
+ * Example type representing the root model structure used in tests and examples.
+ *
+ * @remarks
+ * This type is exported for use in examples and tests to demonstrate
+ * the library's functionality with a concrete data structure.
+ */
+export type Model = {
+  /** Collection of people in the model */
+  people: Person[];
+};

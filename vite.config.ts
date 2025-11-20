@@ -4,11 +4,20 @@ import path from 'path';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({
+    jsxImportSource: '@emotion/react',
+    babel: {
+      plugins: ['@emotion/babel-plugin'],
+    },
+  })],
   resolve: {
     alias: {
       'immertation': path.resolve(__dirname, './src/index.ts'),
     },
+  },
+  test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['**/integration/**', '**/node_modules/**', '**/dist/**', '**/example/**'],
   },
   build: {
     emptyOutDir: false,

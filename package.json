@@ -19,15 +19,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.build.json && vite build",
+    "build:example": "vite build --config vite.config.example.ts",
     "preview": "vite preview",
-    "unit": "vitest run",
-    "lint": "eslint 'src/**/*.{ts,tsx}'",
-    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
+    "unit": "vitest run src",
+    "integration": "playwright test",
+    "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
     "fmt": "prettier --write 'src/**/*.{ts,tsx,json}'"
   },
   "devDependencies": {
+    "@emotion/babel-plugin": "^11.13.5",
     "@faker-js/faker": "^10.1.0",
     "@mobily/ts-belt": "^3.13.1",
+    "@playwright/test": "^1.56.1",
     "@types/lodash": "^4.17.20",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
@@ -46,11 +49,19 @@
     "traverse": "^0.6.11",
     "typescript": "~5.9.3",
     "vite": "^7.2.1",
-    "vitest": "^4.0.7"
+    "vitest": "^4.0.7",
+    "wait-on": "^9.0.3"
   },
   "peerDependencies": {
     "@mobily/ts-belt": "^3.0.0",
     "immer": "^6.0.0",
     "lodash": "^4.17.0"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "antd": "^5.29.1",
+    "lucide-react": "^0.554.0"
   }
 }

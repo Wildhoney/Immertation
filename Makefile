@@ -1,24 +1,27 @@
-.PHONY: fmt lint typecheck unit build checks start deploy
+.PHONY: fmt lint typecheck unit build checks start deploy integration
 
 fmt:
-	npm run fmt
+	pnpm run fmt
 
 lint:
-	npm run lint
+	pnpm run lint
 
 typecheck:
 	npx tsc --noEmit
 
 unit:
-	npm run unit
+	pnpm run unit
+
+integration:
+	pnpm run integration
 
 build:
-	npm run build
+	pnpm run build
 
 start:
-	npm run dev
+	pnpm run dev
 
-checks: fmt lint typecheck unit
+checks: fmt lint typecheck unit integration
 
 deploy:
 	yarn --force

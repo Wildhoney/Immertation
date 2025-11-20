@@ -1,167 +1,145 @@
-import { useMemo, useState } from 'react';
-import { State, Operation } from 'immertation';
-import { model } from './utils';
-import { faker } from '@faker-js/faker';
+import { useMemo, useReducer, useEffect, useState } from 'react';
+import { G } from '@mobily/ts-belt';
+import { User, Loader2, Github } from 'lucide-react';
+import { Button, Space, List, Typography, FloatButton, App } from 'antd';
+import { SortAscendingOutlined, SortDescendingOutlined, PlusOutlined } from '@ant-design/icons';
+import { Global } from '@emotion/react';
+import 'antd/dist/reset.css';
+import { State, Op } from '../../../../src';
+import { model, useController, type Person, type Model } from './utils';
+import * as styles from './styles';
 
-type Person = {
-  id: symbol;
-  name: string;
-  age: number;
-};
-
-type Model = {
-  people: Person[];
-};
+const { Text } = Typography;
 
 export default function People() {
-  const store = useMemo(() => new State<Model>(model), []);
-  const [, forceUpdate] = useState({});
+  const state = useMemo(
+    () =>
+      new State<Model>(model, (value: Person | Person[] | Model) => {
+        if (G.isArray(value)) {
+          return `people/${value.map((person) => person.id.toString()).join(',')}`;
+        }
+        if ('id' in value) {
+          return `person/${value.id.toString()}`;
+        }
+        return String(value);
+      }),
+    []
+  );
+  const forceUpdate = useReducer((x) => x + 1, 0)[1];
+  const { handleUpdate, handleDelete, handleCreate, handleSort } = useController(state);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const triggerRender = () => forceUpdate({});
+  useEffect(() => {
+    return state.observe(() => forceUpdate());
+  }, [state]);
 
-  const handleDelete = async (id: symbol) => {
-    const process = Symbol('delete');
-
-    store.mutate((draft) => {
-      const index = draft.people.findIndex((p) => p.id === id);
-      if (index !== -1) {
-        draft.people[index] = Operation.Remove(process);
-      }
-    });
-
-    triggerRender();
-
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    store.mutate((draft) => void (draft.people = draft.people.filter((p) => p.id !== id)));
-
-    // store.prune(process);
-    // triggerRender();
-  };
-
-  const handleSort = () => {
+  const toggleSort = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-
-    store.mutate((draft) => {
-      draft.people.sort((a, b) => {
-        return newOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      });
-    });
-
     setSortOrder(newOrder);
-    triggerRender();
+    handleSort(newOrder);
   };
 
-  const handleRefresh = async (id: symbol) => {
-    const process = Symbol('refresh');
 
-    const newName = faker.person.fullName();
-    const newAge = faker.number.int({ min: 18, max: 80 });
-
-    store.mutate((draft) => {
-      const index = draft.people.findIndex((p) => p.id === id);
-      if (index !== -1) {
-        draft.people[index] = Operation.Update(
-          { ...draft.people[index], name: newName, age: newAge },
-          process
-        );
-      }
-    });
-
-    triggerRender();
-
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    store.mutate((draft) => {
-      const index = draft.people.findIndex((p) => p.id === id);
-      if (index !== -1) {
-        draft.people[index] = { ...draft.people[index], name: newName, age: newAge };
-      }
-    });
-
-    // store.prune(process);
-    // triggerRender();
-  };
-
-  const handleAdd = async () => {
-    const process = Symbol('add');
-
-    const newName = faker.person.fullName();
-    const newAge = faker.number.int({ min: 18, max: 80 });
-    const newPerson = {
-      id: Symbol(faker.string.uuid()),
-      name: newName,
-      age: newAge,
-    };
-
-    store.mutate((draft) => void (draft.people = [...draft.people, Operation.Add(newPerson, process)]));
-
-    triggerRender();
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    store.mutate((draft) => void (draft.people = [...draft.people, newPerson]));
-
-    // store.prune(process);
-    // triggerRender();
-  };
 
   return (
-    <div>
-      <button onClick={handleSort}>
-        Sort by Name ({sortOrder === 'asc' ? 'Ascending' : 'Descending'})
-      </button>{' '}
-      <button onClick={handleAdd}>Add person</button>
-      <ul>
-        {store.model.people.map((person: Person, index: number) => {
-          const personAnnotations = store.inspect.people[index];
-          const isDeleting = personAnnotations.is(Operation.Remove);
-          const isUpdating = personAnnotations.is(Operation.Update);
-          const isAdding = personAnnotations.is(Operation.Add);
+    <App>
+      <Global styles={styles.globalStyles} />
+      <div css={styles.wrapper}>
+        <h1 css={styles.title}>Immertation</h1>
+        <div css={styles.container}>
+          <div css={styles.buttonGroup}>
+            <Space size="middle">
+              <Button
+                variant="filled"
+                icon={sortOrder === 'asc' ? <SortDescendingOutlined /> : <SortAscendingOutlined />}
+                onClick={toggleSort}
+              >
+                Sort {sortOrder === 'asc' ? 'Descending' : 'Ascending'}
+              </Button>
+              <Button
+                variant="filled"
+                icon={<PlusOutlined />}
+                onClick={handleCreate}
+              >
+                Create Person
+              </Button>
+            </Space>
+          </div>
+          <div css={styles.listContainer}>
+            <List
+          dataSource={state.inspect.people.draft()}
+          renderItem={(person, index) => {
+            const annotations = state.inspect.people[index];
+            const isDeleting = annotations.age.is(Op.Remove);
+            const isCreating = annotations.pending();
+            const isPending = isCreating || isDeleting || annotations.name.pending();
 
-          const draftName = person.name;
-          const draftAge = person.age;
-
-          return (
-            <li
-              key={person.id.toString()}
-              style={{ opacity: isDeleting ? 0.5 : isUpdating || isAdding ? 0.7 : 1 }}
-            >
-              {isAdding ? (
-                <>
-                  Adding: {draftName} - {draftAge}{' '}
-                  <button disabled>Refresh</button> <button disabled>Delete</button>
-                </>
-              ) : isDeleting ? (
-                <>
-                  {draftName} - {draftAge}{' '}
-                  <button disabled>Refresh</button>{' '}
-                  <button disabled>Deleting...</button>
-                </>
-              ) : (
-                <>
-                  {draftName} - {draftAge}
-                  {isUpdating && (
-                    <span style={{ color: '#666', marginLeft: '8px' }}>
-                      (updating...)
-                    </span>
-                  )}{' '}
-                  <button
-                    onClick={() => handleRefresh(person.id)}
-                    disabled={isDeleting || isUpdating}
+            return (
+              <List.Item
+                key={String(person.id)}
+                actions={[
+                  <Button
+                    key="update"
+                    size="small"
+                    disabled={isCreating || annotations.name.is(Op.Update)}
+                    loading={annotations.name.is(Op.Update)}
+                    onClick={() => handleUpdate(person.id)}
                   >
-                    {isUpdating ? 'Refreshing...' : 'Refresh'}
-                  </button>{' '}
-                  <button onClick={() => handleDelete(person.id)} disabled={isDeleting}>
-                    Delete
-                  </button>
-                </>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+                    {annotations.name.is(Op.Update) ? 'Updating…' : 'Update'}
+                  </Button>,
+                  <Button
+                    key="delete"
+                    color="danger"
+                    variant="filled"
+                    size="small"
+                    disabled={isCreating || isDeleting}
+                    loading={isDeleting}
+                    onClick={() => handleDelete(person.id)}
+                  >
+                    {isDeleting ? 'Deleting…' : 'Delete'}
+                  </Button>
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={
+                    isPending ? (
+                      <Loader2 size={20} css={styles.spinningLoader} />
+                    ) : (
+                      <User size={20} css={styles.userIcon} />
+                    )
+                  }
+                  title={
+                    <Space>
+                      <Text css={isCreating ? styles.creatingText : undefined}>
+                        {person.name}
+                      </Text>
+                      {annotations.name.pending() && !isCreating && (
+                        <Text type="secondary" css={styles.secondaryText}>
+                          ({annotations.name.draft()})
+                        </Text>
+                      )}
+                      {isCreating && (
+                        <Text type="secondary" css={styles.creatingSecondaryText}>
+                          (Creating...)
+                        </Text>
+                      )}
+                    </Space>
+                  }
+                />
+              </List.Item>
+            );
+          }}
+        />
+          </div>
+        </div>
+      </div>
+      <FloatButton
+        icon={<Github size={20} />}
+        href="https://github.com/Wildhoney/Immertation"
+        target="_blank"
+        tooltip="View on GitHub"
+        style={{ right: 24, bottom: 24 }}
+      />
+    </App>
   );
 }

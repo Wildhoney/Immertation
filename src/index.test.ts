@@ -1,272 +1,280 @@
+import { Draft, Op, State } from '.';
+import { describe, expect, it } from 'vitest';
 import { faker } from '@faker-js/faker';
-import { Operation, State } from '.';
-import { describe, expect, it, vi } from 'vitest';
 
 describe('mutate()', () => {
-  const process = Symbol('process');
-
   describe('primitives', () => {
     type Model = {
       name: string;
       age: number;
     };
 
+    /**
+     * Tests primitive value updates with and without Draft annotations.
+     * Verifies that direct mutations apply immediately while Draft-wrapped values remain pending.
+     */
     it('updates', () => {
-      const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-
       {
-        const state = new State<Model>(initial);
+        const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+        const state = new State<Model>(initial, (item) => String(item));
         const name = faker.person.firstName() + '!';
-        state.mutate((draft) => void (draft.name = name));
+        const process = state.mutate((draft) => {
+          draft.name = name;
+        });
+
+        expect(process).toBeTypeOf('symbol');
+
         expect(state.model.name).toEqual(name);
+        expect(state.inspect.name.pending()).toBe(false);
       }
 
       {
-        const state = new State<Model>(initial);
+        const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
+        const state = new State<Model>(initial, (item) => String(item));
         const name = faker.person.firstName() + '?';
-        state.mutate((draft) => {
-          draft.name = Operation.Update(name, process);
+        const age = faker.number.int(100);
+        const process = state.mutate((draft) => {
+          draft.name = Draft(name, Op.Update);
+          draft.age = age;
         });
-        expect(state.model.name).toEqual(name);
+
+        expect(process).toBeTypeOf('symbol');
+
+        expect(state.model.name).toEqual(initial.name);
         expect(state.inspect.name.pending()).toBe(true);
-        expect(state.inspect.name.draft()).toEqual(name);
+
+        expect(state.model.age).toEqual(age);
+        expect(state.inspect.age.pending()).toBe(false);
+      }
+    });
+  });
+
+  describe('objects', () => {
+    type Model = {
+      names: {
+        first: string;
+        last: string;
+      };
+    };
+
+    /**
+     * Tests nested object property updates with Draft annotations.
+     * Verifies that individual properties and entire objects can be marked as pending independently.
+     */
+    it('updates', () => {
+      const initial = {
+        names: {
+          first: faker.person.firstName(),
+          last: faker.person.lastName(),
+        },
+      };
+
+      {
+        const state = new State<Model>(initial, (item) => String(item));
+        const first = faker.person.firstName() + '!';
+        const last = faker.person.lastName() + '?';
+        const process = state.mutate((draft) => {
+          draft.names.first = Draft(first, Op.Update);
+          draft.names.last = last;
+        });
+
+        expect(process).toBeTypeOf('symbol');
+        expect(state.inspect.names.pending()).toBe(false);
+
+        expect(state.model.names.first).toEqual(initial.names.first);
+        expect(state.inspect.names.first.pending()).toBe(true);
+
+        expect(state.model.names.last).toEqual(last);
+        expect(state.inspect.names.last.pending()).toBe(false);
+      }
+
+      {
+        const state = new State<Model>(initial, (item) => String(item));
+        const first = faker.person.firstName() + '!';
+        const last = faker.person.lastName() + '?';
+        const process = state.mutate((draft) => {
+          draft.names = Draft({ first, last }, Op.Update);
+        });
+
+        expect(process).toBeTypeOf('symbol');
+        expect(state.inspect.names.pending()).toBe(true);
+
+        expect(state.model.names.first).toEqual(initial.names.first);
+        expect(state.inspect.names.first.pending()).toBe(false);
+
+        expect(state.model.names.last).toEqual(initial.names.last);
+        expect(state.inspect.names.last.pending()).toBe(false);
       }
     });
   });
 
   describe('arrays', () => {
     type Model = {
-      friends: string[];
+      friends: { id: number; name: string }[];
     };
 
+    /**
+     * Tests array item property updates with Draft annotations.
+     * Verifies that individual array item properties can be marked as pending.
+     */
     it('updates', () => {
       const initial = {
         friends: [
-          'A' + faker.person.firstName(),
-          'B' + faker.person.firstName(),
-          'C' + faker.person.firstName(),
+          { id: 1, name: faker.person.firstName() },
+          { id: 2, name: faker.person.firstName() },
+          { id: 3, name: faker.person.firstName() },
         ],
       };
-      const sorted = [...initial.friends].sort();
 
       {
-        const state = new State<Model>(initial);
+        const state = new State<Model>(initial, (value) => {
+          if (Array.isArray(value)) {
+            return `friends/${value.map((item) => item.id).join(',')}`;
+          }
+          return `friend/${value.id}`;
+        });
         const name = faker.person.firstName() + '!';
-
-        state.mutate((draft) => {
-          draft.friends.sort();
-          draft.friends[1] = Operation.Update(name, process);
+        const process = state.mutate((draft) => {
+          draft.friends[1].name = Draft(name, Op.Update);
         });
 
-        const expected = [...sorted];
-        expected[1] = name;
-        expect(state.model.friends).toEqual(expected);
-        expect(state.model.friends[1]).toEqual(name);
+        expect(process).toBeTypeOf('symbol');
+        expect(state.inspect.friends.pending()).toBe(false);
 
-        expect(state.inspect.friends[1].pending()).toBe(true);
-        expect(state.inspect.friends[1].is(Operation.Update)).toBe(true);
-        expect(state.inspect.friends[1].draft()).toEqual(name);
+        expect(state.model.friends[0].name).toEqual(initial.friends[0].name);
+        expect(state.inspect.friends[0].name.pending()).toBe(false);
 
-        expect(state.inspect.friends[0].pending()).toBe(false);
-        expect(state.inspect.friends[2].pending()).toBe(false);
+        expect(state.model.friends[1].name).toEqual(initial.friends[1].name);
+        expect(state.inspect.friends[1].name.pending()).toBe(true);
+
+        expect(state.model.friends[2].name).toEqual(initial.friends[2].name);
+        expect(state.inspect.friends[2].name.pending()).toBe(false);
       }
     });
-  });
-});
 
-describe('prune()', () => {
-  type Model = {
-    name: string;
-    age: number;
-  };
+    /**
+     * Tests that annotations are preserved when array is sorted.
+     * Verifies that pending annotations follow the items to their new positions after sorting.
+     */
+    it('sorts', () => {
+      const initial = {
+        friends: [
+          { id: 3, name: 'Charlie' },
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+        ],
+      };
 
-  /**
-   * Tests that calling prune() with a specific process symbol removes only
-   * the annotations associated with that process, leaving others intact.
-   */
-  it('prunes tasks by process', () => {
-    faker.seed(9);
+      const state = new State<Model>(initial, (value) => {
+        if (Array.isArray(value)) {
+          return `friends/${value.map((item) => item.id).join(',')}`;
+        }
+        return `friend/${value.id}`;
+      });
+      const updatedName = 'Alice Updated';
 
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-    const processes = [Symbol('process1'), Symbol('process2')] as const;
+      const process = state.mutate((draft) => {
+        draft.friends[1].name = Draft(updatedName, Op.Update);
+        draft.friends.sort((a, b) => a.id - b.id);
+      });
 
-    const newName = faker.person.firstName();
-    state.mutate((draft) => void (draft.name = Operation.Update(newName, processes[0])));
+      expect(process).toBeTypeOf('symbol');
 
-    const newAge = faker.number.int(100);
-    state.mutate((draft) => void (draft.age = Operation.Update(newAge, processes[1])));
+      expect(state.model.friends[0].id).toEqual(1);
+      expect(state.model.friends[0].name).toEqual('Alice');
+      expect(state.inspect.friends[0].name.pending()).toBe(true);
 
-    // Before pruning: model has new values, both properties have annotations
-    expect(state.model.name).toEqual(newName);
-    expect(state.model.age).toEqual(newAge);
-    expect(state.inspect.name.pending()).toBe(true);
-    expect(state.inspect.age.pending()).toBe(true);
+      expect(state.model.friends[1].id).toEqual(2);
+      expect(state.model.friends[1].name).toEqual('Bob');
+      expect(state.inspect.friends[1].name.pending()).toBe(false);
 
-    // Prune process1: removes name annotation, model unchanged
-    state.prune(processes[0]);
-
-    expect(state.model.name).toEqual(newName); // Unchanged
-    expect(state.model.age).toEqual(newAge); // Unchanged
-
-    expect(state.inspect.name.pending()).toBe(false); // Annotation removed
-    expect(state.inspect.name.is(Operation.Update)).toBe(false);
-
-    expect(state.inspect.age.pending()).toBe(true); // Still has annotation
-    expect(state.inspect.age.is(Operation.Update)).toBe(true);
-    expect(state.inspect.age.draft()).toEqual(newAge);
-  });
-});
-
-describe('listen()', () => {
-  type Model = {
-    name: string;
-    age: number;
-  };
-
-  /**
-   * Tests that a registered listener is called when mutate() updates the model
-   * and receives the correct State instance with the updated model.
-   */
-  it('invokes listener on mutate', () => {
-    faker.seed(20);
-
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-    const name = faker.person.firstName();
-
-    expect.assertions(1);
-
-    state.listen((state) => {
-      expect(state.model.name).toBe(name);
+      expect(state.model.friends[2].id).toEqual(3);
+      expect(state.model.friends[2].name).toEqual('Charlie');
+      expect(state.inspect.friends[2].name.pending()).toBe(false);
     });
 
-    state.mutate((draft) => void (draft.name = name));
-  });
+    /**
+     * Tests Op.Add behavior for optimistic array item additions.
+     * Verifies that added items appear in draft but not in model until confirmed.
+     */
+    it('adds', () => {
+      const initial = {
+        friends: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+          { id: 3, name: 'Charlie' },
+        ],
+      };
 
-  /**
-   * Tests that a registered listener is called when prune() removes annotations
-   * and receives the correct State instance.
-   */
-  it('invokes listener on prune', () => {
-    faker.seed(21);
+      const state = new State<Model>(initial, (value) => {
+        if (Array.isArray(value)) {
+          return `friends/${value.map((item) => item.id).join(',')}`;
+        }
+        return `friend/${value.id}`;
+      });
+      const newPerson = { id: 4, name: 'David' };
 
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-    const process = Symbol('process');
-    const name = faker.person.firstName();
+      const process = state.mutate((draft) => {
+        draft.friends.push(Draft(newPerson, Op.Add));
+      });
 
-    expect.assertions(2);
+      expect(process).toBeTypeOf('symbol');
 
-    state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
+      expect(state.model.friends.length).toEqual(3);
+      expect(state.model.friends[0].name).toEqual('Alice');
+      expect(state.model.friends[1].name).toEqual('Bob');
+      expect(state.model.friends[2].name).toEqual('Charlie');
 
-    state.listen((state) => {
-      expect(state.model.name).toBe(name);
-      expect(state.inspect.name.pending()).toBe(false);
+      expect(state.inspect.friends.draft().length).toEqual(4);
+      expect(state.inspect.friends.draft()[0].name).toEqual('Alice');
+      expect(state.inspect.friends.draft()[1].name).toEqual('Bob');
+      expect(state.inspect.friends.draft()[2].name).toEqual('Charlie');
+      expect(state.inspect.friends.draft()[3].name).toEqual('David');
+
+      expect(state.inspect.friends[0].pending()).toBe(false);
+      expect(state.inspect.friends[1].pending()).toBe(false);
+      expect(state.inspect.friends[2].pending()).toBe(false);
+      expect(state.inspect.friends[3].pending()).toBe(true);
     });
 
-    state.prune(process);
-  });
+    /**
+     * Tests Op.Remove behavior for optimistic array item deletions.
+     * Verifies that removed items disappear from draft but remain in model until confirmed.
+     */
+    it('removes', () => {
+      const initial = {
+        friends: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+          { id: 3, name: 'Charlie' },
+        ],
+      };
 
-  /**
-   * Tests that multiple listeners can be registered and all are invoked
-   * when the state changes.
-   */
-  it('supports multiple listeners', () => {
-    faker.seed(22);
+      const state = new State<Model>(initial, (value) => {
+        if (Array.isArray(value)) {
+          return `friends/${value.map((item) => item.id).join(',')}`;
+        }
+        return `friend/${value.id}`;
+      });
 
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
+      const process = state.mutate((draft) => {
+        draft.friends[2] = Draft(draft.friends[2], Op.Remove);
+      });
 
-    const listener1 = vi.fn();
-    const listener2 = vi.fn();
-    const listener3 = vi.fn();
+      expect(process).toBeTypeOf('symbol');
 
-    state.listen(listener1);
-    state.listen(listener2);
-    state.listen(listener3);
+      expect(state.model.friends.length).toEqual(3);
+      expect(state.model.friends[0].name).toEqual('Alice');
+      expect(state.model.friends[1].name).toEqual('Bob');
+      expect(state.model.friends[2].name).toEqual('Charlie');
 
-    state.mutate((draft) => void (draft.name = faker.person.firstName()));
+      expect(state.inspect.friends.draft().length).toEqual(2);
+      expect(state.inspect.friends.draft()[0].name).toEqual('Alice');
+      expect(state.inspect.friends.draft()[1].name).toEqual('Bob');
 
-    expect(listener1).toHaveBeenCalledTimes(1);
-    expect(listener2).toHaveBeenCalledTimes(1);
-    expect(listener3).toHaveBeenCalledTimes(1);
-
-    state.mutate((draft) => void (draft.age = faker.number.int(100)));
-
-    expect(listener1).toHaveBeenCalledTimes(2);
-    expect(listener2).toHaveBeenCalledTimes(2);
-    expect(listener3).toHaveBeenCalledTimes(2);
-  });
-
-  /**
-   * Tests that the unsubscribe function returned by listen() correctly
-   * removes the listener so it no longer receives updates.
-   */
-  it('unsubscribe removes listener', () => {
-    faker.seed(23);
-
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-
-    const listener = vi.fn();
-
-    const unsubscribe = state.listen(listener);
-
-    state.mutate((draft) => void (draft.name = faker.person.firstName()));
-    expect(listener).toHaveBeenCalledTimes(1);
-
-    unsubscribe();
-
-    state.mutate((draft) => void (draft.name = faker.person.firstName()));
-    expect(listener).toHaveBeenCalledTimes(1); // Not called again
-  });
-
-  /**
-   * Tests that unsubscribing one listener doesn't affect other listeners.
-   */
-  it('unsubscribing one listener does not affect others', () => {
-    faker.seed(24);
-
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-
-    const listener1 = vi.fn();
-    const listener2 = vi.fn();
-
-    const unsubscribe1 = state.listen(listener1);
-    state.listen(listener2);
-
-    state.mutate((draft) => void (draft.name = faker.person.firstName()));
-    expect(listener1).toHaveBeenCalledTimes(1);
-    expect(listener2).toHaveBeenCalledTimes(1);
-
-    unsubscribe1();
-
-    state.mutate((draft) => void (draft.name = faker.person.firstName()));
-    expect(listener1).toHaveBeenCalledTimes(1); // Not called again
-    expect(listener2).toHaveBeenCalledTimes(2); // Still called
-  });
-
-  /**
-   * Tests that listeners can access both model and inspect proxy
-   * through the received State instance.
-   */
-  it('listener can access model and inspect', () => {
-    faker.seed(25);
-
-    const initial = { name: faker.person.firstName(), age: faker.number.int(100) };
-    const state = new State<Model>(initial);
-    const process = Symbol('process');
-    const name = faker.person.firstName();
-
-    expect.assertions(2);
-
-    state.listen((state) => {
-      expect(state.model.name).toBe(name);
-      expect(state.inspect.name.pending()).toBe(true);
+      expect(state.inspect.friends[0].pending()).toBe(false);
+      expect(state.inspect.friends[1].pending()).toBe(false);
+      expect(state.inspect.friends[2].pending()).toBe(true);
     });
-
-    state.mutate((draft) => void (draft.name = Operation.Update(name, process)));
   });
 });
