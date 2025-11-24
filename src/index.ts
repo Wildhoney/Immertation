@@ -1,58 +1,48 @@
-import {
-  type Recipe,
-  type Process,
-  type Observer,
-  type Identity,
-  type Inspectable,
-  type Registry,
-  type Objectish,
-  type ExtractObjectish,
-} from './types';
-import * as utils from './utils';
+import { nanoid } from 'nanoid';
+import type { Identity, Model, Op, Process, Recipe, Registry } from './types';
+import { Annotation, Config, reconcile } from './utils';
+import clone from 'lodash/cloneDeep';
 
-export class State<M extends Objectish> {
+export class State<M extends Model> {
   #model: M;
-  #registry: Registry = new Map();
-  #observers: Set<Observer<this>> = new Set();
-  #identity: Identity<ExtractObjectish<M>>;
+  #identity: Identity<M>;
+  #registry: Registry<M> = new Map();
 
-  constructor(model: M, identity: Identity<ExtractObjectish<M>>) {
+  constructor(model: M, identity: Identity<M>) {
     this.#model = model;
     this.#identity = identity;
   }
 
-  get model(): M {
-    return utils.present(this.#model, this.#registry, this.#identity);
+  static pk(): string {
+    return nanoid();
   }
 
-  get inspect(): Inspectable<M> {
-    return utils.inspect(this.#model, this.#registry, this.#identity) as Inspectable<M>;
+  static annotate<T>(value: T, operations: Op): T {
+    return new Annotation<T>(value, operations) as T;
   }
 
   mutate(recipe: Recipe<M>): Process {
     const process = Symbol('process');
-    const result = utils.reconcile(this.#model, this.#registry, process, recipe, this.#identity);
-    this.#model = result;
-    this.#notify();
+    const [, patches] = Config.immer.produceWithPatches(clone(this.#model), recipe);
+
+    this.#model = Config.immer.applyPatches(
+      this.#model,
+      patches.map((patch, index) => {
+        const snapshot = Config.immer.applyPatches(clone(this.#model), patches.slice(0, index));
+        return { ...patch, value: reconcile(patch, snapshot, process, this.#registry) };
+      }),
+    );
+
     return process;
   }
 
-  prune(process: Process): void {
-    const [model, registry] = utils.prune(this.#model, this.#registry, process);
-    this.#model = model;
-    this.#registry = registry;
-    this.#notify();
+  get model(): M {
+    return this.#model;
   }
 
-  observe(observer: Observer<this>): () => void {
-    this.#observers.add(observer);
-    return () => this.#observers.delete(observer);
-  }
-
-  #notify(): void {
-    this.#observers.forEach((observer) => observer(this));
+  get registry(): Registry<M> {
+    return this.#registry;
   }
 }
 
-export { Draft, Op } from './types';
-export type { Box, Config } from './types';
+export { Op } from './types';

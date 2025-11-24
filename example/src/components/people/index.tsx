@@ -72,6 +72,7 @@ export default function People() {
             const annotations = state.inspect.people[index];
             const isDeleting = annotations.age.is(Op.Remove);
             const isCreating = annotations.pending();
+            console.log(annotations.pending());
             const isPending = isCreating || isDeleting || annotations.name.pending();
 
             return (
