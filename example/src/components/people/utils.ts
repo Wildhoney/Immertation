@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { A } from '@mobily/ts-belt';
-import { message } from 'antd';
+import { notification } from 'antd';
 import { useMemo, useReducer, useState } from 'react';
 import { State, Op } from '../../../../src';
 import type { Snapshot } from '../../../../src/types';
@@ -28,6 +28,10 @@ function wait(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
+function getPlacement(): 'topRight' | 'bottom' {
+  return window.innerWidth <= 768 ? 'bottom' : 'topRight';
+}
+
 export function useController() {
   const state = useMemo(
     () =>
@@ -38,8 +42,9 @@ export function useController() {
       }),
     [],
   );
-  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+  const [, rerender] = useReducer((x) => x + 1, 0);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sorting, setSorting] = useState(false);
 
   const handleUpdate = async (id: string) => {
     const name = faker.person.firstName();
@@ -48,7 +53,7 @@ export function useController() {
       const index = draft.people.findIndex((person) => person.id === id);
       if (index !== -1) draft.people[index].name = State.annotate(Op.Update, name);
     });
-    forceUpdate();
+    rerender();
 
     await wait();
 
@@ -57,15 +62,16 @@ export function useController() {
       if (index !== -1) draft.people[index].name = name;
     });
     state.prune(process);
-    forceUpdate();
+    rerender();
   };
 
   const handleDelete = async (id: string) => {
+    const name = state.model.people.find((person) => person.id === id)?.name;
     const process = state.mutate((draft) => {
       const index = draft.people.findIndex((person) => person.id === id);
       if (index !== -1) draft.people[index] = State.annotate(Op.Remove, draft.people[index]);
     });
-    forceUpdate();
+    rerender();
 
     await wait();
 
@@ -74,8 +80,8 @@ export function useController() {
       if (index !== -1) draft.people.splice(index, 1);
     });
     state.prune(process);
-    forceUpdate();
-    message.success('Person deleted successfully');
+    rerender();
+    notification.success({ title: 'Deleted', description: `${name} deleted successfully`, placement: getPlacement() });
   };
 
   const handleCreate = async () => {
@@ -87,29 +93,36 @@ export function useController() {
     const process = state.mutate((draft) => {
       draft.people.push(State.annotate(Op.Add, newPerson));
     });
-    forceUpdate();
+    rerender();
 
     await wait();
 
     state.prune(process);
-    forceUpdate();
-    message.success(`${name} created successfully`);
+    rerender();
+    notification.success({ title: 'Created', description: `${name} created successfully`, placement: getPlacement() });
   };
 
-  const handleSort = (order: 'asc' | 'desc') => {
-    state.mutate((draft) => {
-      draft.people.sort((a, b) => {
-        return order === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      });
-    });
-    forceUpdate();
-  };
-
-  const toggleSort = () => {
+  const toggleSort = async () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     setSortOrder(newOrder);
-    handleSort(newOrder);
+    setSorting(true);
+
+    const process = state.mutate((draft) => {
+      draft.people = State.annotate(Op.Sort, draft.people);
+    });
+    rerender();
+
+    await wait();
+
+    state.mutate((draft) => {
+      draft.people.sort((a, b) => {
+        return newOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      });
+    });
+    state.prune(process);
+    setSorting(false);
+    rerender();
   };
 
-  return { state, sortOrder, handleUpdate, handleDelete, handleCreate, toggleSort };
+  return { state, sortOrder, sorting, handleUpdate, handleDelete, handleCreate, toggleSort };
 }

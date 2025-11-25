@@ -28,10 +28,18 @@ export const globalStyles = css`
   body {
     background: white;
   }
+
+  @media (max-width: 768px) {
+    .ant-notification-bottom {
+      left: 50% !important;
+      right: auto !important;
+      transform: translateX(-50%);
+    }
+  }
 `;
 
 export const wrapper = css`
-  width: 500px;
+  width: 700px;
   margin: 40px auto;
   display: flex;
   flex-direction: column;
@@ -57,10 +65,29 @@ export const container = css`
 `;
 
 export const buttonGroup = css`
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
+`;
+
+export const statsGroup = css`
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+`;
+
+export const statBadge = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f0f0;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #595959;
 `;
 
 export const listContainer = css`
@@ -92,6 +119,9 @@ export const creatingSecondaryText = css`
 `;
 
 export const githubButton = css`
-  left: 24px;
-  top: 24px;
+  position: fixed !important;
+  left: 24px !important;
+  top: 24px !important;
+  right: auto !important;
+  bottom: auto !important;
 `;
