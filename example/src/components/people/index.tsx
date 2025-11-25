@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Button, Space, Table, Typography, FloatButton, App, Badge, Tag } from 'antd';
+import { Button, Space, Table, Typography, App, Badge, Tag, FloatButton } from 'antd';
 import {
   SortAscendingOutlined,
   SortDescendingOutlined,
@@ -8,6 +8,7 @@ import {
   TeamOutlined,
   SyncOutlined,
   DeleteOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { Global } from '@emotion/react';
 import 'antd/dist/reset.css';
@@ -133,13 +134,16 @@ export default function People(): ReactElement {
         </div>
       </div>
 
-      <FloatButton
-        css={styles.githubButton}
-        icon={<GithubOutlined />}
-        href="https://github.com/Wildhoney/Immertation"
-        target="_blank"
-        tooltip="View on GitHub"
-      />
+      <div css={styles.cornerLinks}>
+        <a href="/docs/" target="_blank" css={styles.cornerLink}>
+          <FloatButton icon={<FileTextOutlined />} />
+          <span>Docs</span>
+        </a>
+        <a href="https://github.com/Wildhoney/Immertation" target="_blank" css={styles.cornerLink}>
+          <FloatButton icon={<GithubOutlined />} />
+          <span>GitHub</span>
+        </a>
+      </div>
     </App>
   );
 }

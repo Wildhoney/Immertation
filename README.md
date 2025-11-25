@@ -10,6 +10,8 @@
 
 <p align="center">
   <a href="https://wildhoney.github.io/Immertation">View Live Demo</a>
+  &nbsp;·&nbsp;
+  <a href="https://wildhoney.github.io/Immertation/docs/">API Docs</a>
 </p>
 
 > State management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.

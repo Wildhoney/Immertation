@@ -22,7 +22,6 @@ export const globalStyles = css`
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
   }
 
   body {
@@ -61,7 +60,7 @@ export const container = css`
   background: white;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
 `;
 
 export const buttonGroup = css`
@@ -118,10 +117,29 @@ export const creatingSecondaryText = css`
   font-style: italic;
 `;
 
-export const githubButton = css`
-  position: fixed !important;
-  left: 24px !important;
-  top: 24px !important;
-  right: auto !important;
-  bottom: auto !important;
+export const cornerLinks = css`
+  position: fixed;
+  left: 24px;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+export const cornerLink = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #595959;
+  font-size: 13px;
+
+  .ant-float-btn {
+    position: relative !important;
+    inset: auto !important;
+  }
+
+  &:hover {
+    color: #1890ff;
+  }
 `;

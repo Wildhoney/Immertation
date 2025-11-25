@@ -24,7 +24,8 @@
     "unit": "vitest run src",
     "integration": "playwright test",
     "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
-    "fmt": "prettier --write 'src/**/*.{ts,tsx,json}'"
+    "fmt": "prettier --write 'src/**/*.{ts,tsx,json}'",
+    "docs": "typedoc --out example/public/docs --entryPoints src/index.ts src/types.ts --excludePrivate --name Immertation --readme none"
   },
   "devDependencies": {
     "@emotion/babel-plugin": "^11.13.5",
@@ -47,6 +48,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "traverse": "^0.6.11",
+    "typedoc": "^0.28.14",
     "typescript": "~5.9.3",
     "vite": "^7.2.1",
     "vitest": "^4.0.7",

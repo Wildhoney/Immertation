@@ -2,14 +2,41 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { resolve } from 'path';
+import fs from 'fs';
+
+function serveDocsPlugin() {
+  return {
+    name: 'serve-docs',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.startsWith('/docs')) {
+          const filePath = path.join(__dirname, 'example/public', req.url);
+          const indexPath = path.join(filePath, 'index.html');
+
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            return next();
+          }
+          if (fs.existsSync(indexPath)) {
+            req.url = req.url + (req.url.endsWith('/') ? 'index.html' : '/index.html');
+          }
+        }
+        next();
+      });
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react({
-    jsxImportSource: '@emotion/react',
-    babel: {
-      plugins: ['@emotion/babel-plugin'],
-    },
-  })],
+  plugins: [
+    serveDocsPlugin(),
+    react({
+      jsxImportSource: '@emotion/react',
+      babel: {
+        plugins: ['@emotion/babel-plugin'],
+      },
+    }),
+  ],
+  publicDir: 'example/public',
   resolve: {
     alias: {
       'immertation': path.resolve(__dirname, './src/index.ts'),

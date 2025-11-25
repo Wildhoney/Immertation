@@ -81,7 +81,7 @@ export function useController() {
     });
     state.prune(process);
     rerender();
-    notification.success({ title: 'Deleted', description: `${name} deleted successfully`, placement: getPlacement() });
+    notification.success({ message: 'Deleted', description: `${name} deleted successfully`, placement: getPlacement() });
   };
 
   const handleCreate = async () => {
@@ -99,7 +99,7 @@ export function useController() {
 
     state.prune(process);
     rerender();
-    notification.success({ title: 'Created', description: `${name} created successfully`, placement: getPlacement() });
+    notification.success({ message: 'Created', description: `${name} created successfully`, placement: getPlacement() });
   };
 
   const toggleSort = async () => {
