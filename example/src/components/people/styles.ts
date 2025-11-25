@@ -90,3 +90,8 @@ export const creatingSecondaryText = css`
   font-size: 14px;
   font-style: italic;
 `;
+
+export const githubButton = css`
+  left: 24px;
+  top: 24px;
+`;

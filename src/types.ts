@@ -1,25 +1,32 @@
-import type { Objectish } from 'immer';
-import type { Annotation, Config } from './utils';
+import type { Objectish, Patch } from 'immer';
+import { immerable } from 'immer';
 
+/** Base model type that can be used with State */
 export type Model = Objectish;
 
+/** Context for patch reconciliation during mutations */
+export type Reconciliation<M extends Model> = {
+  snapshot: M;
+  patches: Patch[];
+};
+
+/** Property key for annotation tracking */
 export type Property = undefined | null | string | number;
 
-type ExtractObjects<T> = T extends (infer U)[]
-  ? T | ExtractObjects<U>
-  : T extends object
-    ? T | ExtractObjects<T[keyof T]>
-    : never;
+/** Recursive snapshot type for identity function */
+export type Snapshot<T> = T extends (infer U)[] ? T | Snapshot<U> : T extends object ? T | Snapshot<T[keyof T]> : never;
 
-export type Identity<M extends Model> = (snapshot: ExtractObjects<M[keyof M]>) => M;
+/** Function that generates unique IDs from model snapshots */
+export type Identity<M extends Model> = (snapshot: Snapshot<M>) => Id;
 
+/** Immer recipe function for mutating the draft */
 export type Recipe<M extends Model> = (draft: M) => void;
 
-export type Nothing = typeof Config.nothing;
-
+/** Unique symbol identifying a mutation batch */
 export type Process = symbol;
 
-export enum Op {
+/** Operation types for annotations */
+export enum Operation {
   Add = 1,
   Remove = 2,
   Update = 4,
@@ -28,8 +35,69 @@ export enum Op {
   Sort = 32,
 }
 
+/** String identifier for registry keys */
 export type Id = string;
 
-export type Registry<M extends Model> = Map<Id, Annotation<M>[]>;
-
+/** Array path to a value in the model */
 export type Path = (string | number)[];
+
+/** Methods available on inspect proxy */
+type Inspectors = {
+  /** Returns true if any pending annotations exist */
+  pending(): boolean;
+  /** Returns true if annotation matches the given operation */
+  is(operation: Operation): boolean;
+};
+
+/** Recursive proxy type for inspecting annotations at any path */
+export type Inspect<T> = Inspectors & {
+  [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K]>;
+};
+
+/** Internal keys for Annotation class properties */
+enum Keys {
+  Property = 'property',
+  Process = 'process',
+  Value = 'value',
+  Operation = 'operation',
+}
+
+/**
+ * Wrapper for values being tracked with pending operations.
+ * @template T - The wrapped value type
+ */
+export class Annotation<T> {
+  [immerable] = true;
+
+  static readonly keys: Set<string> = new Set(Object.values(Keys));
+
+  public [Keys.Property]: Property = null;
+  public [Keys.Process]: null | Process = null;
+  public [Keys.Value]: T;
+  public [Keys.Operation]: Operation;
+
+  /**
+   * @param {T} value - The value to wrap
+   * @param {Operation} operation - The operation type
+   */
+  constructor(value: T, operation: Operation) {
+    this[Keys.Value] = value;
+    this[Keys.Operation] = operation;
+  }
+
+  /**
+   * Creates a copy with property and process assigned.
+   * @param {Property} property - The property key
+   * @param {Process} process - The process symbol
+   * @returns {Annotation<T>} New annotation with assignments
+   */
+  assign(property: Property, process: Process): Annotation<T> {
+    const annotation = new Annotation(this.value, this.operation);
+    annotation.property = property;
+    annotation.process = process;
+    return annotation;
+  }
+}
+
+/** Map of IDs to their annotations */
+export type Registry<M extends Model> = Map<Id, Annotation<M>[]>;

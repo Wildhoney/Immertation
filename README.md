@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  🧶 <a href="https://wildhoney.github.io/Immertation">View Live Demo →</a>
+  <a href="https://wildhoney.github.io/Immertation">View Live Demo</a>
 </p>
 
 > State management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.
@@ -19,381 +19,198 @@ Operations are particularly useful for async operations and optimistic updates, 
 ## Contents
 
 - [Getting started](#getting-started)
-  - [Using operations](#using-operations)
+  - [Using annotations](#using-annotations)
   - [Available operations](#available-operations)
-  - [Pruning operations](#pruning-operations)
-  - [Listening to changes](#listening-to-changes)
-  - [Passing state to components](#passing-state-to-components)
-  - [Value-based tracking](#value-based-tracking)
-    - [Arrays](#arrays)
-    - [Objects](#objects)
+  - [Identity function](#identity-function)
+  - [Inspecting state](#inspecting-state)
+  - [Pruning annotations](#pruning-annotations)
 
 ## Getting started
 
 ```typescript
-import { State, Operation } from 'immertation';
+import { State, Op } from 'immertation';
 
 type Model = {
   name: string;
   age: number;
 };
 
-const state = new State<Model>({
-  name: 'John',
-  age: 30
-});
+const state = new State<Model>(
+  { name: 'Adam', age: 30 },
+  (snapshot) => JSON.stringify(snapshot)
+);
 
 state.mutate((draft) => {
-  draft.name = 'Jane';
+  draft.name = 'Maria';
   draft.age = 31;
 });
 
-console.log(state.model.name);
-console.log(state.model.age);
+console.log(state.model.name); // 'Maria'
+console.log(state.model.age); // 31
 
-console.log(state.inspect.name.pending());
-console.log(state.inspect.age.pending());
+console.log(state.inspect.name.pending()); // false
+console.log(state.inspect.age.pending()); // false
 ```
 
-## Complete Example: User Management with Async Operations
+### Using annotations
 
-Here's a real-world example showing how to manage a list of users with optimistic updates:
-
-```tsx
-import { State, Draft, Op } from 'immertation';
-import { useEffect, useReducer, useMemo } from 'react';
-
-type User = {
-  id: number;
-  name: string;
-  email: string;
-};
-
-type Model = {
-  users: User[];
-};
-
-const state = new State<Model>(
-  { users: [] },
-  (value) => {
-    if ('id' in value) return `user/${value.id}`;
-    return String(value);
-  }
-);
-
-function useAppState<M>(state: State<M>) {
-  const forceUpdate = useReducer((x) => x + 1, 0)[1];
-
-  useEffect(() => {
-    return state.observe(() => forceUpdate());
-  }, [state]);
-
-  return state;
-}
-
-function useUserController(state: State<Model>) {
-  const updateUser = async (id: number, updates: Partial<User>) => {
-    const process = state.mutate((draft) => {
-      const user = draft.users.find((user) => user.id === id);
-      if (user && updates.name) {
-        user.name = Draft(updates.name, Op.Update);
-      }
-    });
-
-    try {
-      await fetch(`/api/users/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-      });
-
-      state.mutate((draft) => {
-        const user = draft.users.find((user) => user.id === id);
-        if (user && updates.name) user.name = updates.name;
-      });
-      state.prune(process);
-    } catch (error) {
-      const originalUser = state.model.users.find((user) => user.id === id);
-      state.mutate((draft) => {
-        const user = draft.users.find((user) => user.id === id);
-        if (user && originalUser) user.name = originalUser.name;
-      });
-      state.prune(process);
-    }
-  };
-
-  const deleteUser = async (id: number) => {
-    const process = state.mutate((draft) => {
-      const index = draft.users.findIndex((user) => user.id === id);
-      if (index !== -1) {
-        draft.users[index].email = Draft(draft.users[index].email, Op.Remove);
-      }
-    });
-
-    try {
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
-
-      state.mutate((draft) => {
-        const index = draft.users.findIndex((user) => user.id === id);
-        if (index !== -1) draft.users.splice(index, 1);
-      });
-      state.prune(process);
-    } catch (error) {
-      state.prune(process);
-    }
-  };
-
-  const createUser = async (user: Omit<User, 'id'>) => {
-    const tempUser: User = { id: Date.now(), ...user };
-
-    const process = state.mutate((draft) => {
-      draft.users.push(Draft(tempUser, Op.Add));
-    });
-
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        body: JSON.stringify(user),
-      });
-      const created = await response.json();
-
-      state.mutate((draft) => {
-        const index = draft.users.findIndex((user) => user.id === tempUser.id);
-        if (index !== -1) draft.users[index] = created;
-      });
-      state.prune(process);
-    } catch (error) {
-      state.mutate((draft) => {
-        const index = draft.users.findIndex((user) => user.id === tempUser.id);
-        if (index !== -1) draft.users.splice(index, 1);
-      });
-      state.prune(process);
-    }
-  };
-
-  return { updateUser, deleteUser, createUser };
-}
-
-function UserList() {
-  const state = useAppState(appState);
-  const { updateUser, deleteUser, createUser } = useUserController(state);
-
-  return (
-    <div>
-      {state.inspect.users.draft().map((user, index) => {
-        const annotations = state.inspect.users[index];
-        const isDeleting = annotations.email.is(Op.Remove);
-        const isCreating = annotations.pending();
-        const isUpdating = annotations.name.is(Op.Update);
-
-        return (
-          <div key={user.id}>
-            <span style={{ opacity: isDeleting ? 0.5 : 1 }}>
-              {user.name}
-              {isCreating && ' (Creating...)'}
-              {isUpdating && ' (Updating...)'}
-              {isDeleting && ' (Deleting...)'}
-            </span>
-            <button
-              onClick={() => updateUser(user.id, { name: 'New Name' })}
-              disabled={isCreating || isUpdating}
-            >
-              Update
-            </button>
-            <button
-              onClick={() => deleteUser(user.id)}
-              disabled={isCreating || isDeleting}
-            >
-              Delete
-            </button>
-          </div>
-        );
-      })}
-      <button onClick={() => createUser({ name: 'New User', email: 'new@example.com' })}>
-        Add User
-      </button>
-    </div>
-  );
-}
-```
-
-### Using operations
-
-Operations allow you to track pending changes with annotations. This is especially useful for optimistic updates in async operations, where you want to immediately reflect changes in the UI while the operation is still in progress:
+Annotations allow you to track pending changes. This is especially useful for optimistic updates in async operations, where you want to immediately reflect changes in the UI while the operation is still in progress:
 
 ```typescript
-const process = Symbol('update-user');
+import { State, Op } from 'immertation';
 
+// Annotate a value to mark it as pending
 state.mutate((draft) => {
-  draft.name = Operation.Update('Jane', process);
-  draft.age = Operation.Update(31, process);
+  draft.name = State.annotate('Maria', Op.Update);
 });
 
-console.log(state.model.name);
-console.log(state.model.age);
+// The model retains the original value
+console.log(state.model.name); // 'Adam'
 
-console.log(state.inspect.name.pending());
-console.log(state.inspect.name.remaining());
-console.log(state.inspect.name.is(Operation.Update));
-console.log(state.inspect.name.is(Operation.Add));
+// But we can check if it has a pending operation
+console.log(state.inspect.name.pending()); // true
 
-console.log(state.inspect.name.draft());
-console.log(state.inspect.age.draft());
+// Later, commit the actual change
+state.mutate((draft) => {
+  draft.name = 'Maria';
+});
+
+console.log(state.model.name); // 'Maria'
+console.log(state.inspect.name.pending()); // false
 ```
 
 ### Available operations
 
-- `Operation.Add` - Mark a value as being added
-- `Operation.Remove` - Mark a value as being removed
-- `Operation.Update` - Mark a value as being updated
-- `Operation.Replace` - Mark a value as being updated and replaced
-- `Operation.Move` - Mark a value as being moved
-- `Operation.Sort` - Mark a value as being sorted
+The `Op` enum provides operation types for annotations:
 
-### Pruning operations
-
-Remove operation records by process. This is useful when async operations complete or fail, allowing you to clean up tracked operations:
+- `Op.Add` - Mark a value as being added
+- `Op.Remove` - Mark a value as being removed
+- `Op.Update` - Mark a value as being updated
+- `Op.Replace` - Mark a value as being replaced
+- `Op.Move` - Mark a value as being moved
+- `Op.Sort` - Mark a value as being sorted
 
 ```typescript
-const process1 = Symbol('process1');
-const process2 = Symbol('process2');
-
+// Adding a new item
 state.mutate((draft) => {
-  draft.name = Operation.Update('Alice', process1);
+  draft.locations.push(State.annotate({ id: State.pk(), name: 'London' }, Op.Add));
 });
 
+// Marking for removal (keeps item until actually removed)
 state.mutate((draft) => {
-  draft.age = Operation.Update(25, process2);
+  const index = draft.locations.findIndex((loc) => loc.id === id);
+  draft.locations[index] = State.annotate(draft.locations[index], Op.Remove);
 });
 
-state.prune(process1);
-
-console.log(state.model.name);
-console.log(state.model.age);
-
-console.log(state.inspect.name.pending());
-console.log(state.inspect.name.is(Operation.Update));
-
-console.log(state.inspect.age.pending());
-console.log(state.inspect.age.is(Operation.Update));
-```
-
-### Listening to changes
-
-Register listeners to be notified whenever the model or annotations change. This is particularly useful for integrating with reactive frameworks like React:
-
-```typescript
-const state = new State({ count: 0 });
-
-const unsubscribe = state.listen((state) => {
-  console.log('Count changed:', state.model.count);
-  console.log('Has pending operations:', state.inspect.count.pending());
-});
-
+// Updating a property
 state.mutate((draft) => {
-  draft.count = 1;
-});
-
-unsubscribe();
-```
-
-**React integration example:**
-
-```typescript
-function useState<M>(state: State<M>) {
-  const [, forceUpdate] = useReducer((x) => x + 1, 0);
-
-  useEffect(() => {
-    const unsubscribe = state.listen(() => forceUpdate());
-    return unsubscribe;
-  }, [state]);
-
-  return state;
-}
-```
-
-### Passing state to components
-
-Use `box()` to pass values with their annotations to components:
-
-```tsx
-import type { Box } from 'immertation';
-
-type Props = {
-  count: Box<number>;
-};
-
-function Counter({ count }: Props) {
-  return (
-    <div>
-      <span>{count.model}</span>
-      {count.inspect.pending() && <Spinner />}
-    </div>
-  );
-}
-
-<Counter count={state.inspect.count.box()} />
-```
-
-### Value-based tracking
-
-Annotations follow values, not positions. When values match by identity, annotations are preserved through sorts, replacements, and reorders.
-
-#### Arrays
-
-```typescript
-const state = new State({ friends: ['Alice', 'Bob', 'Charlie'] });
-const process = Symbol('update');
-
-state.mutate((draft) => {
-  draft.friends[0] = Operation.Update('Alice-Updated', process);
-  draft.friends.sort();
+  draft.user.name = State.annotate('New Name', Op.Update);
 });
 ```
 
-For object arrays, provide an identity function:
+### Identity function
+
+The identity function provides stable keys for tracking values across mutations. It receives any value from your model and should return a unique string identifier:
 
 ```typescript
-const state = new State(
-  { people: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] },
-  (person) => person.id
+type Person = { id: string; name: string };
+type Model = { people: Person[] };
+
+const state = new State<Model>(
+  { people: [] },
+  (snapshot) => {
+    // Handle different value types
+    if ('id' in snapshot) return snapshot.id;
+    if (Array.isArray(snapshot)) return snapshot.map((p) => p.id).join(',');
+    return JSON.stringify(snapshot);
+  }
 );
 ```
 
-#### Objects
+This allows annotations to follow values even when arrays are sorted or reordered.
 
-Annotations survive object replacements when values match:
+### Inspecting state
+
+The `inspect` property provides a proxy to check pending operations at any path:
 
 ```typescript
-const state = new State({ user: { name: 'Alice', age: 30 } });
+// Check if a value has any pending operation
+state.inspect.name.pending(); // boolean
 
-state.mutate((draft) => {
-  draft.user.name = Operation.Update('Alice', process);
-});
+// Check for a specific operation type
+state.inspect.users[0].is(Op.Add); // true if being created
+state.inspect.users[0].is(Op.Remove); // true if being deleted
 
-state.mutate((draft) => {
-  draft.user = { name: 'Alice', age: 31 };
-});
+// Works with nested paths
+state.inspect.user.profile.email.pending();
+
+// Works with array indices
+state.inspect.locations[0].name.pending();
 ```
 
-## Implementation
+### Pruning annotations
 
-### Core Algorithm
+Remove annotations by process after async operations complete:
 
-The library uses Immer's `produceWithPatches` to track state changes. When mutations occur with `Draft()` annotations:
+```typescript
+const process = state.mutate((draft) => {
+  draft.name = State.annotate('New Name', Op.Update);
+});
 
-1. **Iterate over patches**: Loop through all patches generated by Immer
-2. **Clone and apply**: For each patch, clone the model and apply patches up to that point
-3. **Find annotations**: Recursively search for `Annotation` instances in `patch.value`
-4. **Replace with current values**: Replace annotations with actual values from the cloned model at that path
-5. **Store in registry**: Use the identity function to generate a unique key and store the annotation in the registry
+// After async operation completes
+state.prune(process);
+```
 
-### Identity Function
+## Complete Example
 
-The identity function (`(item) => item?.id ? \`person/\${item.id}\` : undefined`) provides stable keys for tracking values across mutations, similar to React keys. This allows the library to match annotations to current model values even when arrays are sorted or filtered.
+```tsx
+import { State, Op } from 'immertation';
+import { useReducer, useMemo } from 'react';
 
-### Inspection
+type User = { id: string; name: string };
+type Model = { users: User[] };
 
-The `inspect` proxy uses the identity function to look up annotations in the registry:
-- `pending()`: Returns true if an annotation exists for this value
-- `draft()`: Returns the draft value from the annotation
-- `is(Op)`: Checks if the annotation contains a specific operation type
+function UserList() {
+  const state = useMemo(
+    () => new State<Model>(
+      { users: [] },
+      (value) => ('id' in value ? value.id : JSON.stringify(value))
+    ),
+    []
+  );
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+
+  const updateUser = async (id: string) => {
+    const newName = 'Updated Name';
+
+    // Mark as updating (optimistic)
+    state.mutate((draft) => {
+      const user = draft.users.find((u) => u.id === id);
+      if (user) user.name = State.annotate(newName, Op.Update);
+    });
+    forceUpdate();
+
+    // Simulate API call
+    await fetch(`/api/users/${id}`, { method: 'PATCH' });
+
+    // Commit the change
+    state.mutate((draft) => {
+      const user = draft.users.find((u) => u.id === id);
+      if (user) user.name = newName;
+    });
+    forceUpdate();
+  };
+
+  return (
+    <div>
+      {state.model.users.map((user, index) => (
+        <div key={user.id}>
+          <span>{user.name}</span>
+          {state.inspect.users[index].name.pending() && ' (Updating...)'}
+          <button onClick={() => updateUser(user.id)}>Update</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
