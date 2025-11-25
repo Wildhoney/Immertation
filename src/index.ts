@@ -55,7 +55,7 @@ export class State<M extends Model> {
    * @returns {T} The annotated value (typed as T for assignment compatibility)
    */
   annotate<T>(operation: Operation, value: T): T {
-    return new Annotation<T>(value, operation) as T;
+    return <T>new Annotation<T>(value, operation);
   }
 
   /** Shorthand alias for {@link annotate} using the Greek delta symbol. */

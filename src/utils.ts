@@ -103,7 +103,7 @@ export function reconcile<M extends Model>(
 
       Object.entries(model)
         .filter(([key, value]) => !Annotation.keys.has(key) && value instanceof Annotation)
-        .forEach(([key, value]) => discover(value as M, path.concat(key)));
+        .forEach(([key, value]) => discover(<M>value, path.concat(key)));
 
       if (primitive(model.value)) {
         const context = get(snapshot, path.slice(0, -1).join('.'));

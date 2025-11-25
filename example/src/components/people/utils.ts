@@ -16,11 +16,11 @@ export type Model = {
 };
 
 export const model: Model = {
-  people: A.makeWithIndex(5, () => ({
+  people: <Person[]> A.makeWithIndex(5, () => ({
     id: State.pk(),
     name: faker.person.firstName(),
     age: faker.number.int({ min: 18, max: 80 }),
-  })) as Person[],
+  })),
 };
 
 function wait(): Promise<void> {

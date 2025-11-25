@@ -135,9 +135,9 @@ export default function People(): ReactElement {
       </div>
 
       <div css={styles.cornerLinks}>
-        <a href="/docs/" target="_blank" css={styles.cornerLink}>
+        <a href="docs/" target="_blank" css={styles.cornerLink}>
           <FloatButton icon={<FileTextOutlined />} />
-          <span>Docs</span>
+          <span>API Docs</span>
         </a>
         <a href="https://github.com/Wildhoney/Immertation" target="_blank" css={styles.cornerLink}>
           <FloatButton icon={<GithubOutlined />} />

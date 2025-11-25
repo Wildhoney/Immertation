@@ -20,6 +20,7 @@ export default defineConfig({
       immertation: path.resolve(__dirname, './src/index.ts'),
     },
   },
+  publicDir: 'example/public',
   build: {
     outDir: 'dist-example',
     emptyOutDir: true,
