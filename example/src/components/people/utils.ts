@@ -51,7 +51,7 @@ export function useController() {
 
     const process = state.mutate((draft) => {
       const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index].name = State.annotate(Op.Update, name);
+      if (index !== -1) draft.people[index].name = state.annotate(Op.Update, name);
     });
     rerender();
 
@@ -69,7 +69,7 @@ export function useController() {
     const name = state.model.people.find((person) => person.id === id)?.name;
     const process = state.mutate((draft) => {
       const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index] = State.annotate(Op.Remove, draft.people[index]);
+      if (index !== -1) draft.people[index] = state.annotate(Op.Remove, draft.people[index]);
     });
     rerender();
 
@@ -91,7 +91,7 @@ export function useController() {
     const newPerson: Person = { id, name, age };
 
     const process = state.mutate((draft) => {
-      draft.people.push(State.annotate(Op.Add, newPerson));
+      draft.people.push(state.annotate(Op.Add, newPerson));
     });
     rerender();
 
@@ -108,7 +108,7 @@ export function useController() {
     setSorting(true);
 
     const process = state.mutate((draft) => {
-      draft.people = State.annotate(Op.Sort, draft.people);
+      draft.people = state.annotate(Op.Sort, draft.people);
     });
     rerender();
 

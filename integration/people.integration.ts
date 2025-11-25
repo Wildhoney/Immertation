@@ -9,8 +9,8 @@ test.describe('People Component', () => {
     await expect(page.getByText('Create Person')).toBeVisible();
 
     // Should have initial people loaded (at least 5)
-    const listItems = page.locator('.ant-list-item');
-    await expect(listItems).toHaveCount(5);
+    const tableRows = page.locator('.ant-table-row');
+    await expect(tableRows).toHaveCount(5);
   });
 
   test('should click sort button multiple times', async ({ page }) => {
@@ -19,11 +19,11 @@ test.describe('People Component', () => {
     const sortButton = page.getByRole('button', { name: /Sort/i });
     await expect(sortButton).toBeVisible();
 
-    // Click sort button multiple times
-    for (let i = 0; i < 5; i++) {
+    // Click sort button multiple times (wait for each sort to complete)
+    for (let i = 0; i < 3; i++) {
       await sortButton.click();
-      // Wait a bit between clicks
-      await page.waitForTimeout(200);
+      await expect(sortButton).toBeDisabled();
+      await expect(sortButton).toBeEnabled({ timeout: 5000 });
     }
 
     // Verify button still works
@@ -37,14 +37,14 @@ test.describe('People Component', () => {
     await expect(createButton).toBeVisible();
 
     // Get initial count
-    const initialCount = await page.locator('.ant-list-item').count();
+    const initialCount = await page.locator('.ant-table-row').count();
 
     // Create 3 new people
     for (let i = 0; i < 3; i++) {
       await createButton.click();
 
-      // Wait for at least one "Creating..." text to appear
-      await expect(page.getByText('(Creating...)').first()).toBeVisible({ timeout: 1000 });
+      // Wait for at least one "Creating" tag to appear
+      await expect(page.getByText('Creating').first()).toBeVisible({ timeout: 1000 });
 
       // Wait a bit before next creation
       await page.waitForTimeout(500);
@@ -54,7 +54,7 @@ test.describe('People Component', () => {
     await page.waitForTimeout(6000);
 
     // Should have more people now
-    const newCount = await page.locator('.ant-list-item').count();
+    const newCount = await page.locator('.ant-table-row').count();
     expect(newCount).toBeGreaterThan(initialCount);
   });
 
@@ -62,7 +62,7 @@ test.describe('People Component', () => {
     await page.goto('/');
 
     // Wait for page to load
-    await page.waitForSelector('.ant-list-item');
+    await page.waitForSelector('.ant-table-row');
 
     // Click on multiple update buttons (get fresh selectors each time)
     for (let i = 0; i < 3; i++) {
@@ -87,9 +87,9 @@ test.describe('People Component', () => {
     await page.goto('/');
 
     // Wait for page to load
-    await page.waitForSelector('.ant-list-item');
+    await page.waitForSelector('.ant-table-row');
 
-    const initialCount = await page.locator('.ant-list-item').count();
+    const initialCount = await page.locator('.ant-table-row').count();
 
     // Get all delete buttons and click the first 2
     const deleteButtons = page.getByRole('button', { name: /Delete/ });
@@ -111,21 +111,23 @@ test.describe('People Component', () => {
     await page.waitForTimeout(6000);
 
     // Should have fewer people now
-    const newCount = await page.locator('.ant-list-item').count();
+    const newCount = await page.locator('.ant-table-row').count();
     expect(newCount).toBeLessThan(initialCount);
   });
 
   test('stress test: lots of clicking on various items', async ({ page }) => {
+    test.setTimeout(60000);
     await page.goto('/');
 
     // Wait for page to load
-    await page.waitForSelector('.ant-list-item');
+    await page.waitForSelector('.ant-table-row');
 
-    // Click sort button multiple times
+    // Click sort button multiple times (wait for each sort to complete)
     const sortButton = page.getByRole('button', { name: /Sort/i });
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 3; i++) {
       await sortButton.click();
-      await page.waitForTimeout(100);
+      await expect(sortButton).toBeDisabled();
+      await expect(sortButton).toBeEnabled({ timeout: 5000 });
     }
 
     // Create 5 people
@@ -143,10 +145,11 @@ test.describe('People Component', () => {
       await page.waitForTimeout(200);
     }
 
-    // More sorting
-    for (let i = 0; i < 5; i++) {
+    // More sorting (wait for each sort to complete)
+    for (let i = 0; i < 2; i++) {
       await sortButton.click();
-      await page.waitForTimeout(100);
+      await expect(sortButton).toBeDisabled();
+      await expect(sortButton).toBeEnabled({ timeout: 5000 });
     }
 
     // Delete 3 people

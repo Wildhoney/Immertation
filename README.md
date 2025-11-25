@@ -61,7 +61,7 @@ import { State, Op } from 'immertation';
 
 // Annotate a value to mark it as pending
 state.mutate((draft) => {
-  draft.name = State.annotate(Op.Update, 'Maria');
+  draft.name = state.annotate(Op.Update, 'Maria');
 });
 
 // The model retains the original value
@@ -93,18 +93,18 @@ The `Op` enum provides operation types for annotations:
 ```typescript
 // Adding a new item
 state.mutate((draft) => {
-  draft.locations.push(State.annotate(Op.Add, { id: State.pk(), name: 'London' }));
+  draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: 'London' }));
 });
 
 // Marking for removal (keeps item until actually removed)
 state.mutate((draft) => {
   const index = draft.locations.findIndex((loc) => loc.id === id);
-  draft.locations[index] = State.annotate(Op.Remove, draft.locations[index]);
+  draft.locations[index] = state.annotate(Op.Remove, draft.locations[index]);
 });
 
 // Updating a property
 state.mutate((draft) => {
-  draft.user.name = State.annotate(Op.Update, 'New Name');
+  draft.user.name = state.annotate(Op.Update, 'New Name');
 });
 ```
 
@@ -157,7 +157,7 @@ Remove annotations by process after async operations complete:
 
 ```typescript
 const process = state.mutate((draft) => {
-  draft.name = State.annotate(Op.Update, 'New Name');
+  draft.name = state.annotate(Op.Update, 'New Name');
 });
 
 // After async operation completes
@@ -184,12 +184,12 @@ function UserList() {
   const [, forceUpdate] = useReducer((x) => x + 1, 0);
 
   const updateUser = async (id: string) => {
-    const newName = 'Updated Name';
+    const name = 'Updated Name';
 
     // Mark as updating (optimistic)
     state.mutate((draft) => {
       const user = draft.users.find((u) => u.id === id);
-      if (user) user.name = State.annotate(Op.Update, newName);
+      if (user) user.name = state.annotate(Op.Update, name);
     });
     forceUpdate();
 
@@ -199,7 +199,7 @@ function UserList() {
     // Commit the change
     state.mutate((draft) => {
       const user = draft.users.find((u) => u.id === id);
-      if (user) user.name = newName;
+      if (user) user.name = name;
     });
     forceUpdate();
   };

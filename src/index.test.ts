@@ -63,12 +63,12 @@ describe('State', () => {
       {
         const name = faker.person.firstName();
         state.mutate((draft) => {
-          draft.name = State.annotate(Op.Update, {
+          draft.name = state.annotate(Op.Update, {
             id: draft.name.id,
             first: 'A',
-            last: State.annotate(Op.Update, 'T'),
+            last: state.annotate(Op.Update, 'T'),
           });
-          draft.name.first = State.annotate(Op.Update, name);
+          draft.name.first = state.annotate(Op.Update, name);
           draft.age += 1;
         });
 
@@ -108,7 +108,7 @@ describe('State', () => {
         const city = faker.location.city();
         state.mutate((draft) => {
           const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations[index].name = State.annotate(Op.Update, city);
+          draft.locations[index].name = state.annotate(Op.Update, city);
         });
         expect(state.model.locations[1].name).toBe(model.locations[1].name);
         expect(state.inspect.locations[1].name.pending()).toBe(true);
@@ -118,7 +118,7 @@ describe('State', () => {
       const city = faker.location.city();
       state.mutate((draft) => {
         draft.locations.sort();
-        draft.locations.push(State.annotate(Op.Add, { id: State.pk(), name: city }));
+        draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: city }));
       });
 
       const index = state.model.locations.findIndex((location) => location.id === id);
@@ -138,7 +138,7 @@ describe('State', () => {
       const id = model.locations[0].id;
 
       state.mutate((draft) => {
-        draft.locations[0].name = State.annotate(Op.Update, 'Pending City');
+        draft.locations[0].name = state.annotate(Op.Update, 'Pending City');
       });
       expect(state.inspect.locations[0].name.pending()).toBe(true);
 
@@ -166,7 +166,7 @@ describe('State', () => {
 
       const city = faker.location.city();
       state.mutate((draft) => {
-        draft.locations.push(State.annotate(Op.Add, { id: State.pk(), name: city }));
+        draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: city }));
       });
       expect(state.model.locations.length).toBe(4);
       expect(state.model.locations[3].name).toBe(city);
@@ -176,7 +176,7 @@ describe('State', () => {
         const id = model.locations[1].id;
         state.mutate((draft) => {
           const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations[index] = State.annotate(Op.Remove, draft.locations[index]);
+          draft.locations[index] = state.annotate(Op.Remove, draft.locations[index]);
         });
         expect(state.model.locations.length).toBe(4);
         expect(state.model.locations.find((location) => location.id === id)).toBeDefined();
@@ -202,7 +202,7 @@ describe('State', () => {
       const state = new State<Model>(model, identity);
 
       state.mutate((draft) => {
-        draft.name.first = State.annotate(Op.Update | Op.Replace, 'Combined');
+        draft.name.first = state.annotate(Op.Update | Op.Replace, 'Combined');
       });
 
       expect(state.inspect.name.first.pending()).toBe(true);
@@ -227,7 +227,7 @@ describe('State', () => {
       const state = new State<Model>(model, identity);
 
       const process = state.mutate((draft) => {
-        draft.name.first = State.annotate(Op.Update, 'Pending');
+        draft.name.first = state.annotate(Op.Update, 'Pending');
       });
       expect(state.inspect.name.first.pending()).toBe(true);
       expect(state.inspect.name.first.draft()).toBe('Pending');
@@ -254,7 +254,7 @@ describe('State', () => {
       const state = new State<Model>(model, identity);
 
       state.mutate((draft) => {
-        draft.name.first = State.δ(Op.Update, 'Pending');
+        draft.name.first = state.δ(Op.Update, 'Pending');
       });
 
       expect(state.inspect.name.first.pending()).toBe(true);

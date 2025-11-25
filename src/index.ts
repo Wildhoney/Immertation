@@ -37,22 +37,6 @@ export class State<M extends Model> {
   }
 
   /**
-   * Returns the current model state.
-   * @returns {M} The current model
-   */
-  get model(): M {
-    return this.#model;
-  }
-
-  /**
-   * Returns a proxy for inspecting pending operations at any path.
-   * @returns {Inspect<M>} Proxy with pending() and is() methods
-   */
-  get inspect(): Inspect<M> {
-    return inspect(this.#model, this.#registry, this.#identity);
-  }
-
-  /**
    * Generates a unique primary key using nanoid.
    * @returns {string} A unique identifier
    */
@@ -70,12 +54,28 @@ export class State<M extends Model> {
    * @param {T} value - The value to annotate
    * @returns {T} The annotated value (typed as T for assignment compatibility)
    */
-  static annotate<T>(operation: Operation, value: T): T {
+  annotate<T>(operation: Operation, value: T): T {
     return new Annotation<T>(value, operation) as T;
   }
 
-  /** Shorthand alias for {@link State.annotate} using the Greek delta symbol. */
-  static δ = State.annotate;
+  /** Shorthand alias for {@link annotate} using the Greek delta symbol. */
+  δ = this.annotate;
+
+  /**
+   * Returns the current model state.
+   * @returns {M} The current model
+   */
+  get model(): M {
+    return this.#model;
+  }
+
+  /**
+   * Returns a proxy for inspecting pending operations at any path.
+   * @returns {Inspect<M>} Proxy with pending() and is() methods
+   */
+  get inspect(): Inspect<M> {
+    return inspect(this.#model, this.#registry, this.#identity);
+  }
 
   /**
    * Applies mutations to the model using an Immer recipe.
