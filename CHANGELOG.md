@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.9](https://github.com/Wildhoney/Immertation/compare/v0.1.8...v0.1.9) (2025-11-25)
+
+
+### Features
+
+* added docs ([cdfc436](https://github.com/Wildhoney/Immertation/commit/cdfc436b25accb738f78f9039cda29b40db62cd5))
+* added new tests ([02334c7](https://github.com/Wildhoney/Immertation/commit/02334c71315eaf20dc7a637999885f1e882bf3c7))
+* added new testsm unit ([cab7c71](https://github.com/Wildhoney/Immertation/commit/cab7c71971d399916f26f3aeb587422dfa9c5df8))
+* another rethink on the implementation ([4b4b316](https://github.com/Wildhoney/Immertation/commit/4b4b316bafabcd3376b9ec210def69af6a0475d4))
+* cleaned up the example + README ([5d777eb](https://github.com/Wildhoney/Immertation/commit/5d777ebced80a6a13dd3326ef7315608e9ef8289))
+* simplified the design of the ux ([808a554](https://github.com/Wildhoney/Immertation/commit/808a554898e15aefb7fbe544de2caf50758d1582))
+* updated example with new design and functionality ([6aef0c9](https://github.com/Wildhoney/Immertation/commit/6aef0c9664f5d8a908b70704376df06306e1a919))
+* updated example with new design and functionality ([c77a74c](https://github.com/Wildhoney/Immertation/commit/c77a74ce232b13dabf244dbb8aa7b927b18c5c8a))
+* updated implementation, added example ([986fc65](https://github.com/Wildhoney/Immertation/commit/986fc65bc6187a81659a4c06c16fb3698512b0e0))
+
+
+### Bug Fixes
+
+* prevent annotations being passed to identity() fn ([1a1295e](https://github.com/Wildhoney/Immertation/commit/1a1295e8f756dc41b9c26ff0acdd1f99dc2fc5c9))
+
 ## [0.1.8](https://github.com/Wildhoney/Immertation/compare/v0.1.7...v0.1.8) (2025-11-12)
 
 
