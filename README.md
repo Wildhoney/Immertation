@@ -38,16 +38,16 @@ type Model = {
 };
 
 const state = new State<Model>(
-  { name: 'Adam', age: 30 },
+  { name: 'Imogen', age: 30 },
   (snapshot) => JSON.stringify(snapshot)
 );
 
 state.mutate((draft) => {
-  draft.name = 'Maria';
+  draft.name = 'Phoebe';
   draft.age = 31;
 });
 
-console.log(state.model.name); // 'Maria'
+console.log(state.model.name); // 'Phoebe'
 console.log(state.model.age); // 31
 
 console.log(state.inspect.name.pending()); // false
@@ -62,22 +62,18 @@ Annotations allow you to track pending changes. This is especially useful for op
 import { State, Op } from 'immertation';
 
 // Annotate a value to mark it as pending
-state.mutate((draft) => {
-  draft.name = state.annotate(Op.Update, 'Maria');
-});
+state.mutate((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
 
 // The model retains the original value
-console.log(state.model.name); // 'Adam'
+console.log(state.model.name); // 'Imogen'
 
 // But we can check if it has a pending operation
 console.log(state.inspect.name.pending()); // true
 
 // Later, commit the actual change
-state.mutate((draft) => {
-  draft.name = 'Maria';
-});
+state.mutate((draft) => void (draft.name = 'Phoebe'));
 
-console.log(state.model.name); // 'Maria'
+console.log(state.model.name); // 'Phoebe'
 console.log(state.inspect.name.pending()); // false
 ```
 
@@ -94,9 +90,7 @@ The `Op` enum provides operation types for annotations:
 
 ```typescript
 // Adding a new item
-state.mutate((draft) => {
-  draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: 'London' }));
-});
+state.mutate((draft) => void draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: 'Horsham' })));
 
 // Marking for removal (keeps item until actually removed)
 state.mutate((draft) => {
@@ -105,9 +99,7 @@ state.mutate((draft) => {
 });
 
 // Updating a property
-state.mutate((draft) => {
-  draft.user.name = state.annotate(Op.Update, 'New Name');
-});
+state.mutate((draft) => void (draft.user.name = state.annotate(Op.Update, 'Phoebe')));
 ```
 
 ### Identity function
@@ -146,6 +138,9 @@ state.inspect.users[0].is(Op.Remove); // true if being deleted
 // Get the draft value (annotated value or actual model value)
 state.inspect.name.draft(); // returns annotated value if pending, otherwise model value
 
+// Wait for a value to have no pending annotations
+const value = await state.inspect.name.settled(); // resolves when annotations are pruned
+
 // Works with nested paths
 state.inspect.user.profile.email.pending();
 
@@ -158,9 +153,7 @@ state.inspect.locations[0].name.pending();
 Remove annotations by process after async operations complete:
 
 ```typescript
-const process = state.mutate((draft) => {
-  draft.name = state.annotate(Op.Update, 'New Name');
-});
+const process = state.mutate((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
 
 // After async operation completes
 state.prune(process);

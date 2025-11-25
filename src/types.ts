@@ -49,6 +49,8 @@ type Inspectors<T = unknown> = {
   is(operation: Operation): boolean;
   /** Returns the draft value from the latest annotation, or the actual value from the model */
   draft(): T | undefined;
+  /** Returns a promise that resolves with the value when no more annotations exist at this path */
+  settled(): Promise<T>;
 };
 
 /** Recursive proxy type for inspecting annotations at any path */
@@ -103,3 +105,9 @@ export class Annotation<T> {
 
 /** Map of IDs to their annotations */
 export type Registry<M extends Model> = Map<Id, Annotation<M>[]>;
+
+/** Callback for registry change subscriptions */
+export type Subscriber = () => void;
+
+/** Function to add or remove a subscriber */
+export type Subscribe = (subscriber: Subscriber) => void;

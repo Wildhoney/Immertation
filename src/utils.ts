@@ -10,6 +10,7 @@ import {
   type Property,
   type Registry,
   type Snapshot,
+  type Subscribe,
 } from './types';
 import { A, G } from '@mobily/ts-belt';
 import { get } from 'lodash';
@@ -40,20 +41,28 @@ export function primitive(value: unknown): value is string | number | boolean | 
 
 /**
  * Creates a proxy for inspecting pending annotations at any path.
- * @param {M} model - The model to inspect
+ * @param {() => M} model - Function to get the current model state
  * @param {Registry<M>} registry - The annotation registry
  * @param {Identity<M>} identity - Identity function for lookups
- * @returns {Inspect<M>} Proxy with pending() and is() methods
+ * @param {Subscribe} subscribe - Function to subscribe to registry changes
+ * @param {Subscribe} unsubscribe - Function to unsubscribe from registry changes
+ * @returns {Inspect<M>} Proxy with pending(), is(), draft(), and settled() methods
  */
-export function inspect<M extends Model>(model: M, registry: Registry<M>, identity: Identity<M>): Inspect<M> {
+export function inspect<M extends Model>(
+  model: () => M,
+  registry: Registry<M>,
+  identity: Identity<M>,
+  subscribe: Subscribe,
+  unsubscribe: Subscribe,
+): Inspect<M> {
   /**
    * Retrieves annotations for a given path from both object and property levels.
    * @param {string[]} path - The path segments to the target value
    */
   function annotations(path: string[]) {
     const key = path.at(-1);
-    const target = get(model, path);
-    const parent = get(model, path.slice(0, -1));
+    const target = get(model(), path);
+    const parent = get(model(), path.slice(0, -1));
 
     const object = G.isObject(target)
       ? (registry.get(identity(target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
@@ -72,7 +81,19 @@ export function inspect<M extends Model>(model: M, registry: Registry<M>, identi
         if (property === 'is')
           return (operation: Operation) =>
             annotations(path).some((annotation) => (annotation.operation & operation) !== 0);
-        if (property === 'draft') return () => A.last(annotations(path))?.value ?? get(model, path);
+        if (property === 'draft') return () => A.last(annotations(path))?.value ?? get(model(), path);
+        if (property === 'settled')
+          return () =>
+            new Promise((resolve) => {
+              if (A.isEmpty(annotations(path))) return resolve(get(model(), path));
+              const check = () => {
+                if (A.isEmpty(annotations(path))) {
+                  unsubscribe(check);
+                  resolve(get(model(), path));
+                }
+              };
+              subscribe(check);
+            });
         return proxy([...path, String(property)]);
       },
     }));

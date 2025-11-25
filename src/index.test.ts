@@ -239,6 +239,63 @@ describe('State', () => {
   });
 
   /**
+   * Tests for the settled() method which returns a promise that resolves
+   * when no more annotations exist at a given path.
+   */
+  describe('settled()', () => {
+    /**
+     * Verifies that settled() resolves with the current model value once there are no more annotations.
+     */
+    it('resolves when there are no more annotations', async () => {
+      const state = new State<Model>(model, identity);
+      const value = faker.person.firstName();
+
+      const process = state.mutate((draft) => {
+        draft.name.first = state.annotate(Op.Update, value);
+      });
+
+      const name = state.inspect.name.first.settled();
+      expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.model.name.first).toBe(model.name.first);
+
+      state.mutate((draft) => void (draft.name.first = value));
+      state.prune(process);
+
+      expect(await name).toBe(value);
+    });
+
+    /**
+     * Verifies that settled() resolves immediately if no annotations exist.
+     */
+    it('resolves immediately when no annotations', async () => {
+      const state = new State<Model>(model, identity);
+      expect(await state.inspect.name.first.settled()).toBe(model.name.first);
+    });
+
+    /**
+     * Verifies that settled() only resolves when ALL annotations are pruned, not just some.
+     */
+    it('waits for all annotations to be pruned', async () => {
+      const state = new State<Model>(model, identity);
+      const value = faker.person.firstName();
+
+      const process1 = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
+      const process2 = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
+
+      const name = state.inspect.name.first.settled();
+      expect(state.inspect.name.first.pending()).toBe(true);
+
+      state.prune(process1);
+      expect(state.inspect.name.first.pending()).toBe(true);
+
+      state.mutate((draft) => void (draft.name.first = value));
+      state.prune(process2);
+
+      expect(await name).toBe(value);
+    });
+  });
+
+  /**
    * Tests for Greek letter shorthand aliases.
    */
   describe('aliases', () => {

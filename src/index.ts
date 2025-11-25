@@ -9,6 +9,7 @@ import {
   type Recipe,
   type Reconciliation,
   type Registry,
+  type Subscriber,
 } from './types';
 import { Config, inspect, reconcile } from './utils';
 import clone from 'lodash/cloneDeep';
@@ -25,6 +26,8 @@ export class State<M extends Model> {
   #identity: Identity<M>;
   /** Map of IDs to their annotations */
   #registry: Registry<M> = new Map();
+  /** Subscribers waiting for registry changes */
+  #subscribers: Set<Subscriber> = new Set();
 
   /**
    * Creates a new State instance.
@@ -71,10 +74,16 @@ export class State<M extends Model> {
 
   /**
    * Returns a proxy for inspecting pending operations at any path.
-   * @returns {Inspect<M>} Proxy with pending() and is() methods
+   * @returns {Inspect<M>} Proxy with pending(), is(), draft(), and settled() methods
    */
   get inspect(): Inspect<M> {
-    return inspect(this.#model, this.#registry, this.#identity);
+    return inspect(
+      () => this.#model,
+      this.#registry,
+      this.#identity,
+      (subscriber) => this.#subscribers.add(subscriber),
+      (subscriber) => this.#subscribers.delete(subscriber),
+    );
   }
 
   /**
@@ -113,6 +122,7 @@ export class State<M extends Model> {
       if (A.isEmpty(remaining)) this.#registry.delete(id);
       else this.#registry.set(id, remaining);
     });
+    this.#subscribers.forEach((subscriber) => subscriber());
   }
 }
 
