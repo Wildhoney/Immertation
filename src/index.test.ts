@@ -63,8 +63,12 @@ describe('State', () => {
       {
         const name = faker.person.firstName();
         state.mutate((draft) => {
-          draft.name = State.tag({ id: draft.name.id, first: 'A', last: State.tag('T', Op.Update) }, Op.Update);
-          draft.name.first = State.tag(name, Op.Update);
+          draft.name = State.annotate(Op.Update, {
+            id: draft.name.id,
+            first: 'A',
+            last: State.annotate(Op.Update, 'T'),
+          });
+          draft.name.first = State.annotate(Op.Update, name);
           draft.age += 1;
         });
 
@@ -72,8 +76,11 @@ describe('State', () => {
         expect(state.model.age).toBe(model.age + 2);
         expect(state.inspect.name.pending()).toBe(true);
         expect(state.inspect.name.first.pending()).toBe(true);
+        expect(state.inspect.name.first.draft()).toBe(name);
         expect(state.inspect.name.last.pending()).toBe(true);
+        expect(state.inspect.name.last.draft()).toBe('T');
         expect(state.inspect.age.pending()).toBe(false);
+        expect(state.inspect.age.draft()).toBe(model.age + 2);
       }
 
       {
@@ -97,18 +104,21 @@ describe('State', () => {
       const state = new State<Model>(model, identity);
       const id = model.locations[1].id;
 
-      state.mutate((draft) => {
+      {
         const city = faker.location.city();
-        const index = draft.locations.findIndex((location) => location.id === id);
-        draft.locations[index].name = State.tag(city, Op.Update);
-      });
-      expect(state.model.locations[1].name).toBe(model.locations[1].name);
-      expect(state.inspect.locations[1].name.pending()).toBe(true);
+        state.mutate((draft) => {
+          const index = draft.locations.findIndex((location) => location.id === id);
+          draft.locations[index].name = State.annotate(Op.Update, city);
+        });
+        expect(state.model.locations[1].name).toBe(model.locations[1].name);
+        expect(state.inspect.locations[1].name.pending()).toBe(true);
+        expect(state.inspect.locations[1].name.draft()).toBe(city);
+      }
 
       const city = faker.location.city();
       state.mutate((draft) => {
         draft.locations.sort();
-        draft.locations.push(State.tag({ id: State.pk(), name: city }, Op.Add));
+        draft.locations.push(State.annotate(Op.Add, { id: State.pk(), name: city }));
       });
 
       const index = state.model.locations.findIndex((location) => location.id === id);
@@ -128,7 +138,7 @@ describe('State', () => {
       const id = model.locations[0].id;
 
       state.mutate((draft) => {
-        draft.locations[0].name = State.tag('Pending City', Op.Update);
+        draft.locations[0].name = State.annotate(Op.Update, 'Pending City');
       });
       expect(state.inspect.locations[0].name.pending()).toBe(true);
 
@@ -156,7 +166,7 @@ describe('State', () => {
 
       const city = faker.location.city();
       state.mutate((draft) => {
-        draft.locations.push(State.tag({ id: State.pk(), name: city }, Op.Add));
+        draft.locations.push(State.annotate(Op.Add, { id: State.pk(), name: city }));
       });
       expect(state.model.locations.length).toBe(4);
       expect(state.model.locations[3].name).toBe(city);
@@ -166,7 +176,7 @@ describe('State', () => {
         const id = model.locations[1].id;
         state.mutate((draft) => {
           const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations[index] = State.tag(draft.locations[index], Op.Remove);
+          draft.locations[index] = State.annotate(Op.Remove, draft.locations[index]);
         });
         expect(state.model.locations.length).toBe(4);
         expect(state.model.locations.find((location) => location.id === id)).toBeDefined();
@@ -182,6 +192,24 @@ describe('State', () => {
         expect(state.model.locations.length).toBe(3);
         expect(state.model.locations.find((location) => location.id === id)).toBeUndefined();
       }
+    });
+
+    /**
+     * Verifies that combined operation bitmasks work correctly with is(),
+     * allowing multiple operations to be checked simultaneously.
+     */
+    it('supports combined operations bitmask', () => {
+      const state = new State<Model>(model, identity);
+
+      state.mutate((draft) => {
+        draft.name.first = State.annotate(Op.Update | Op.Replace, 'Combined');
+      });
+
+      expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.inspect.name.first.is(Op.Update)).toBe(true);
+      expect(state.inspect.name.first.is(Op.Replace)).toBe(true);
+      expect(state.inspect.name.first.is(Op.Add)).toBe(false);
+      expect(state.inspect.name.first.is(Op.Remove)).toBe(false);
     });
   });
 
@@ -199,12 +227,37 @@ describe('State', () => {
       const state = new State<Model>(model, identity);
 
       const process = state.mutate((draft) => {
-        draft.name.first = State.tag('Pending', Op.Update);
+        draft.name.first = State.annotate(Op.Update, 'Pending');
       });
       expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.inspect.name.first.draft()).toBe('Pending');
 
       state.prune(process);
       expect(state.inspect.name.first.pending()).toBe(false);
+      expect(state.inspect.name.first.draft()).toBe(model.name.first);
+    });
+  });
+
+  /**
+   * Tests for Greek letter shorthand aliases.
+   */
+  describe('aliases', () => {
+    /** Verifies that κ is an alias for pk. */
+    it('κ generates unique ids like pk', () => {
+      const id = State.κ();
+      expect(typeof id).toBe('string');
+      expect(id.length).toBeGreaterThan(0);
+    });
+
+    /** Verifies that δ is an alias for annotate. */
+    it('δ annotates values like annotate', () => {
+      const state = new State<Model>(model, identity);
+
+      state.mutate((draft) => {
+        draft.name.first = State.δ(Op.Update, 'Pending');
+      });
+
+      expect(state.inspect.name.first.pending()).toBe(true);
     });
   });
 });

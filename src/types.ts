@@ -42,15 +42,17 @@ export type Id = string;
 export type Path = (string | number)[];
 
 /** Methods available on inspect proxy */
-type Inspectors = {
+type Inspectors<T = unknown> = {
   /** Returns true if any pending annotations exist */
   pending(): boolean;
   /** Returns true if annotation matches the given operation */
   is(operation: Operation): boolean;
+  /** Returns the draft value from the latest annotation, or the actual value from the model */
+  draft(): T | undefined;
 };
 
 /** Recursive proxy type for inspecting annotations at any path */
-export type Inspect<T> = Inspectors & {
+export type Inspect<T> = Inspectors<T> & {
   [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K]>;
 };
 

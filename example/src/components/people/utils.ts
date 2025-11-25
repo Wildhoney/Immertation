@@ -46,7 +46,7 @@ export function useController() {
 
     const process = state.mutate((draft) => {
       const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index].name = State.tag(name, Op.Update);
+      if (index !== -1) draft.people[index].name = State.annotate(Op.Update, name);
     });
     forceUpdate();
 
@@ -63,7 +63,7 @@ export function useController() {
   const handleDelete = async (id: string) => {
     const process = state.mutate((draft) => {
       const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index] = State.tag(draft.people[index], Op.Remove);
+      if (index !== -1) draft.people[index] = State.annotate(Op.Remove, draft.people[index]);
     });
     forceUpdate();
 
@@ -85,7 +85,7 @@ export function useController() {
     const newPerson: Person = { id, name, age };
 
     const process = state.mutate((draft) => {
-      draft.people.push(State.tag(newPerson, Op.Add));
+      draft.people.push(State.annotate(Op.Add, newPerson));
     });
     forceUpdate();
 

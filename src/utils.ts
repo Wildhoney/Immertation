@@ -70,7 +70,9 @@ export function inspect<M extends Model>(model: M, registry: Registry<M>, identi
       get(_, property) {
         if (property === 'pending') return () => !A.isEmpty(annotations(path));
         if (property === 'is')
-          return (operation: Operation) => annotations(path).some((annotation) => annotation.operation === operation);
+          return (operation: Operation) =>
+            annotations(path).some((annotation) => (annotation.operation & operation) !== 0);
+        if (property === 'draft') return () => A.last(annotations(path))?.value ?? get(model, path);
         return proxy([...path, String(property)]);
       },
     }));

@@ -60,16 +60,22 @@ export class State<M extends Model> {
     return nanoid();
   }
 
+  /** Shorthand alias for {@link State.pk} using the Greek kappa symbol. */
+  static κ = State.pk;
+
   /**
-   * Tags a value with an annotation for tracking operations.
+   * Wraps a value with an annotation for tracking operations.
    * @template T - The value type
-   * @param {T} value - The value to tag
    * @param {Operation} operation - The operation type (Add, Remove, Update, etc.)
-   * @returns {T} The tagged value (typed as T for assignment compatibility)
+   * @param {T} value - The value to annotate
+   * @returns {T} The annotated value (typed as T for assignment compatibility)
    */
-  static tag<T>(value: T, operation: Operation): T {
+  static annotate<T>(operation: Operation, value: T): T {
     return new Annotation<T>(value, operation) as T;
   }
+
+  /** Shorthand alias for {@link State.annotate} using the Greek delta symbol. */
+  static δ = State.annotate;
 
   /**
    * Applies mutations to the model using an Immer recipe.
