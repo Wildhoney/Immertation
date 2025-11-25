@@ -61,13 +61,13 @@ export class State<M extends Model> {
   }
 
   /**
-   * Wraps a value with an annotation for tracking operations.
+   * Tags a value with an annotation for tracking operations.
    * @template T - The value type
-   * @param {T} value - The value to annotate
+   * @param {T} value - The value to tag
    * @param {Operation} operation - The operation type (Add, Remove, Update, etc.)
-   * @returns {T} The annotated value (typed as T for assignment compatibility)
+   * @returns {T} The tagged value (typed as T for assignment compatibility)
    */
-  static annotate<T>(value: T, operation: Operation): T {
+  static tag<T>(value: T, operation: Operation): T {
     return new Annotation<T>(value, operation) as T;
   }
 
@@ -110,4 +110,4 @@ export class State<M extends Model> {
   }
 }
 
-export { Operation, Operation as Op } from './types';
+export { Operation, Operation as Op, type Id, type Identity, type Snapshot } from './types';

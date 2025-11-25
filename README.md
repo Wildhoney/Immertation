@@ -19,7 +19,7 @@ Operations are particularly useful for async operations and optimistic updates, 
 ## Contents
 
 - [Getting started](#getting-started)
-  - [Using annotations](#using-annotations)
+  - [Tagging values](#tagging-values)
   - [Available operations](#available-operations)
   - [Identity function](#identity-function)
   - [Inspecting state](#inspecting-state)
@@ -52,16 +52,16 @@ console.log(state.inspect.name.pending()); // false
 console.log(state.inspect.age.pending()); // false
 ```
 
-### Using annotations
+### Tagging values
 
-Annotations allow you to track pending changes. This is especially useful for optimistic updates in async operations, where you want to immediately reflect changes in the UI while the operation is still in progress:
+Tags allow you to track pending changes. This is especially useful for optimistic updates in async operations, where you want to immediately reflect changes in the UI while the operation is still in progress:
 
 ```typescript
 import { State, Op } from 'immertation';
 
-// Annotate a value to mark it as pending
+// Tag a value to mark it as pending
 state.mutate((draft) => {
-  draft.name = State.annotate('Maria', Op.Update);
+  draft.name = State.tag('Maria', Op.Update);
 });
 
 // The model retains the original value
@@ -93,18 +93,18 @@ The `Op` enum provides operation types for annotations:
 ```typescript
 // Adding a new item
 state.mutate((draft) => {
-  draft.locations.push(State.annotate({ id: State.pk(), name: 'London' }, Op.Add));
+  draft.locations.push(State.tag({ id: State.pk(), name: 'London' }, Op.Add));
 });
 
 // Marking for removal (keeps item until actually removed)
 state.mutate((draft) => {
   const index = draft.locations.findIndex((loc) => loc.id === id);
-  draft.locations[index] = State.annotate(draft.locations[index], Op.Remove);
+  draft.locations[index] = State.tag(draft.locations[index], Op.Remove);
 });
 
 // Updating a property
 state.mutate((draft) => {
-  draft.user.name = State.annotate('New Name', Op.Update);
+  draft.user.name = State.tag('New Name', Op.Update);
 });
 ```
 
@@ -154,7 +154,7 @@ Remove annotations by process after async operations complete:
 
 ```typescript
 const process = state.mutate((draft) => {
-  draft.name = State.annotate('New Name', Op.Update);
+  draft.name = State.tag('New Name', Op.Update);
 });
 
 // After async operation completes
@@ -186,7 +186,7 @@ function UserList() {
     // Mark as updating (optimistic)
     state.mutate((draft) => {
       const user = draft.users.find((u) => u.id === id);
-      if (user) user.name = State.annotate(newName, Op.Update);
+      if (user) user.name = State.tag(newName, Op.Update);
     });
     forceUpdate();
 
