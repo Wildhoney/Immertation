@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.11](https://github.com/Wildhoney/Immertation/compare/v0.1.9...v0.1.11) (2025-11-27)
+
+
+### Features
+
+* added state.settled(m) ([051ae7d](https://github.com/Wildhoney/Immertation/commit/051ae7d67006478434e6f5aa56130f4e802d1139))
+* using symbols for tracking by default ([6802b14](https://github.com/Wildhoney/Immertation/commit/6802b14f8e0b5d816efd8708458139bd8b9b28a0))
+
+
+### Bug Fixes
+
+* api docs ([8f06476](https://github.com/Wildhoney/Immertation/commit/8f06476295e341b53c5f86a3817e0a312150ae48))
+
 ## [0.1.10](https://github.com/Wildhoney/Immertation/compare/v0.1.9...v0.1.10) (2025-11-27)
 
 
