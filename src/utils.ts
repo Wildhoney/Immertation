@@ -17,7 +17,7 @@ import {
 
 export { Config, type Tagged } from './types';
 import { A, G } from '@mobily/ts-belt';
-import { get } from 'lodash';
+import get from 'lodash/get';
 
 /**
  * Recursively tags all objects in a model with unique IDs for identity tracking.
@@ -60,7 +60,13 @@ export function identity<M extends Model>(snapshot: Snapshot<M>): string {
       .join(',');
   }
 
-  return (<Tagged>snapshot)[Config.tag] ?? JSON.stringify(snapshot);
+  const tag = (<Tagged>snapshot)[Config.tag];
+  if (tag) return tag;
+  try {
+    return JSON.stringify(snapshot);
+  } catch {
+    return `[unserializable:${typeof snapshot}]`;
+  }
 }
 
 /**
@@ -98,8 +104,9 @@ export function inspect<M extends Model>(
   /**
    * Retrieves annotations for a given path from both object and property levels.
    * @param {string[]} path - The path segments to the target value
+   * @returns {Annotation<M>[]} Combined array of object-level and property-level annotations
    */
-  function annotations(path: string[]) {
+  function annotations(path: string[]): Annotation<M>[] {
     const key = path.at(-1);
     const target = get(model(), path);
     const parent = get(model(), path.slice(0, -1));

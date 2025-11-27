@@ -7,12 +7,10 @@ import {
   type Operation,
   type Process,
   type Recipe,
-  type Reconciliation,
   type Registry,
   type Subscriber,
 } from './types';
 import * as utils from './utils';
-import clone from 'lodash/cloneDeep';
 import { A } from '@mobily/ts-belt';
 
 /**
@@ -93,24 +91,18 @@ export class State<M extends Model> {
    */
   mutate(recipe: Recipe<M>): Process {
     const process = Symbol('process');
-    const [, patches] = utils.Config.immer.produceWithPatches(clone(this.#model), recipe);
 
-    this.#model = utils.Config.immer.applyPatches(
+    const [, patches] = utils.Config.immer.produceWithPatches(this.#model, recipe);
+
+    this.#model = patches.reduce(
+      (model, patch) =>
+        utils.Config.immer.applyPatches(model, [
+          { ...patch, value: utils.reconcile(patch, model, process, this.#registry, this.#identity) },
+        ]),
       this.#model,
-      patches.reduce<Reconciliation<M>>(
-        (context, patch) => {
-          const value = utils.reconcile(patch, context.snapshot, process, this.#registry, this.#identity);
-          return {
-            snapshot: utils.Config.immer.applyPatches(context.snapshot, [{ ...patch, value }]),
-            patches: [...context.patches, { ...patch, value }],
-          };
-        },
-        { snapshot: clone(this.#model), patches: [] },
-      ).patches,
     );
-
     this.#model = utils.tag(this.#model);
-    this.#subscribers.forEach((subscriber) => subscriber());
+    this.#notify();
 
     return process;
   }
@@ -125,6 +117,11 @@ export class State<M extends Model> {
       if (A.isEmpty(remaining)) this.#registry.delete(id);
       else this.#registry.set(id, remaining);
     });
+    this.#notify();
+  }
+
+  /** Notifies all subscribers of state changes. */
+  #notify(): void {
     this.#subscribers.forEach((subscriber) => subscriber());
   }
 

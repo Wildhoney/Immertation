@@ -1,15 +1,9 @@
-import type { Objectish, Patch } from 'immer';
+import type { Objectish } from 'immer';
 import { enablePatches, Immer, immerable } from 'immer';
 import { nanoid } from 'nanoid';
 
 /** Base model type that can be used with State */
 export type Model = Objectish;
-
-/** Context for patch reconciliation during mutations */
-export type Reconciliation<M extends Model> = {
-  snapshot: M;
-  patches: Patch[];
-};
 
 /** Property key for annotation tracking */
 export type Property = undefined | null | string | number;
@@ -51,7 +45,10 @@ export type Id = string;
 /** Array path to a value in the model */
 export type Path = (string | number)[];
 
-/** Methods available on inspect proxy */
+/**
+ * Methods available on the inspect proxy for checking annotation status.
+ * @template T - The type of the value being inspected
+ */
 type Inspectors<T = unknown> = {
   /** Returns true if any pending annotations exist */
   pending(): boolean;
@@ -63,7 +60,11 @@ type Inspectors<T = unknown> = {
   settled(): Promise<T>;
 };
 
-/** Recursive proxy type for inspecting annotations at any path */
+/**
+ * Recursive proxy type for inspecting annotations at any path in the model.
+ * Combines inspector methods with recursive property access.
+ * @template T - The type of the value being inspected
+ */
 export type Inspect<T> = Inspectors<T> & {
   [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K]>;
 };

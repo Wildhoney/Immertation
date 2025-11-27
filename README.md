@@ -25,6 +25,7 @@ Operations are particularly useful for async operations and optimistic updates, 
   - [Available operations](#available-operations)
   - [Inspecting state](#inspecting-state)
   - [Pruning annotations](#pruning-annotations)
+  - [Observing changes](#observing-changes)
   - [Identity function](#custom-identity-function)
 
 ## Getting started
@@ -133,6 +134,19 @@ const process = state.mutate((draft) => void (draft.name = state.annotate(Op.Upd
 
 // After async operation completes
 state.prune(process);
+```
+
+### Observing changes
+
+Subscribe to model changes to react whenever mutations occur:
+
+```typescript
+const unsubscribe = state.observe((model) => {
+  console.log('Model changed:', model);
+});
+
+// Later, stop listening
+unsubscribe();
 ```
 
 ### Identity function
