@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml">
+    <img src="https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml/badge.svg" alt="Checks">
+  </a>
+</p>
+
+<p align="center">
   <a href="https://wildhoney.github.io/Immertation">View Live Demo</a>
   &nbsp;·&nbsp;
   <a href="https://wildhoney.github.io/Immertation/docs/">API Docs</a>
