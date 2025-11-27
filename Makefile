@@ -27,7 +27,7 @@ dev:
 checks: fmt lint typecheck unit integration
 
 deploy:
-	yarn --force
+	pnpm install
 	make build
 	npx commit-and-tag-version
 	npm publish

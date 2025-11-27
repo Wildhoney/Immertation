@@ -1,6 +1,7 @@
 {
   "name": "immertation",
   "version": "0.1.10",
+  "packageManager": "pnpm@10.24.0",
   "license": "MIT",
   "type": "module",
   "main": "./dist/immertation.cjs",
