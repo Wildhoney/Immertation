@@ -1,6 +1,7 @@
-import { enablePatches, Immer, type Patch } from 'immer';
+import type { Patch } from 'immer';
 import {
   Annotation,
+  Config,
   type Identity,
   type Inspect,
   type Model,
@@ -11,16 +12,55 @@ import {
   type Registry,
   type Snapshot,
   type Subscribe,
+  type Tagged,
 } from './types';
+
+export { Config, type Tagged } from './types';
 import { A, G } from '@mobily/ts-belt';
 import { get } from 'lodash';
 
-/** Shared Immer instance with patches enabled */
-export class Config {
-  static immer = (() => {
-    enablePatches();
-    return new Immer();
-  })();
+/**
+ * Recursively tags all objects in a model with unique IDs for identity tracking.
+ * Returns a new object with tags applied (immutable).
+ * Arrays are not tagged directly, but their child objects are.
+ * Idempotent: if an object already has a tag, it is preserved.
+ * @param {T} model - The model to tag
+ * @returns {T} A new model with tags applied
+ */
+export function tag<T>(model: T): T {
+  if (G.isNullable(model) || primitive(model)) return model;
+
+  if (G.isArray(model)) {
+    return <T>model.map((item) => tag(item));
+  }
+
+  if (G.isObject(model)) {
+    const entries = Object.entries(model).map(([key, value]) => [key, tag(value)]);
+    return <T>{
+      ...Object.fromEntries(entries),
+      [Config.tag]: (<Tagged>model)[Config.tag] ?? Config.id(),
+    };
+  }
+
+  return model;
+}
+
+/**
+ * Default identity function using Config.tag.
+ * For objects: returns the tag ID.
+ * For arrays: returns a comma-separated list of child object tags.
+ * @param {Snapshot<M>} snapshot - The value to identify (only objects and arrays)
+ * @returns {string} A unique string identifier
+ */
+export function identity<M extends Model>(snapshot: Snapshot<M>): string {
+  if (Array.isArray(snapshot)) {
+    return (<Tagged[]>snapshot)
+      .filter((item) => Config.tag in item)
+      .map((item) => item[Config.tag] ?? '')
+      .join(',');
+  }
+
+  return (<Tagged>snapshot)[Config.tag] ?? JSON.stringify(snapshot);
 }
 
 /**
@@ -64,9 +104,10 @@ export function inspect<M extends Model>(
     const target = get(model(), path);
     const parent = get(model(), path.slice(0, -1));
 
-    const object = G.isObject(target)
-      ? (registry.get(identity(target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
-      : [];
+    const object =
+      G.isObject(target) || G.isArray(target)
+        ? (registry.get(identity(target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
+        : [];
     const property = G.isObject(parent)
       ? (registry.get(identity(parent))?.filter((annotation) => annotation.property === key) ?? [])
       : [];
@@ -132,8 +173,9 @@ export function reconcile<M extends Model>(
         return value ?? <M>(<unknown>model.value);
       }
 
-      register(value ?? model.value, model, null, process, registry, identity);
-      return G.isNullable(value) ? discover(model.value, path) : (discover(model.value, path), <M>value);
+      const target = value ?? tag(model.value);
+      register(target, model, null, process, registry, identity);
+      return G.isNullable(value) ? <M>target : (discover(model.value, path), <M>value);
     }
 
     if (G.isArray(model)) {

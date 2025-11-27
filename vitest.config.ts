@@ -5,5 +5,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     exclude: ['**/node_modules/**', '**/integration/**'],
+    reporters: ['default', 'html'],
+    outputFile: {
+      html: 'vitest-report/index.html',
+    },
   },
 });

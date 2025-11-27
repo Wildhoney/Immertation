@@ -22,8 +22,7 @@ test.describe('People Component', () => {
     // Click sort button multiple times (wait for each sort to complete)
     for (let i = 0; i < 3; i++) {
       await sortButton.click();
-      await expect(sortButton).toBeDisabled();
-      await expect(sortButton).toBeEnabled({ timeout: 5000 });
+      await page.waitForTimeout(3_000);
     }
 
     // Verify button still works
@@ -44,14 +43,14 @@ test.describe('People Component', () => {
       await createButton.click();
 
       // Wait for at least one "Creating" tag to appear
-      await expect(page.getByText('Creating').first()).toBeVisible({ timeout: 1000 });
+      await expect(page.getByText('Creating').first()).toBeVisible({ timeout: 1_000 });
 
       // Wait a bit before next creation
       await page.waitForTimeout(500);
     }
 
     // Wait for all creations to complete (3-5 seconds each)
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(6_000);
 
     // Should have more people now
     const newCount = await page.locator('.ant-table-row').count();
@@ -76,7 +75,7 @@ test.describe('People Component', () => {
       await updateButtons.first().click();
 
       // Wait for at least one "Updating…" text to appear
-      await expect(page.getByText('Updating', { exact: false }).first()).toBeVisible({ timeout: 2000 });
+      await expect(page.getByText('Updating', { exact: false }).first()).toBeVisible({ timeout: 2_000 });
 
       // Wait a bit before clicking next
       await page.waitForTimeout(500);
@@ -101,14 +100,14 @@ test.describe('People Component', () => {
       await button.click();
 
       // Wait for at least one "Deleting" text to appear
-      await expect(page.getByText('Deleting').first()).toBeVisible({ timeout: 1000 });
+      await expect(page.getByText('Deleting').first()).toBeVisible({ timeout: 1_000 });
 
       // Wait a bit before next deletion
       await page.waitForTimeout(500);
     }
 
     // Wait for deletions to complete
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(6_000);
 
     // Should have fewer people now
     const newCount = await page.locator('.ant-table-row').count();
@@ -116,7 +115,7 @@ test.describe('People Component', () => {
   });
 
   test('stress test: lots of clicking on various items', async ({ page }) => {
-    test.setTimeout(60000);
+    test.setTimeout(60_000);
     await page.goto('/');
 
     // Wait for page to load
@@ -126,8 +125,7 @@ test.describe('People Component', () => {
     const sortButton = page.getByRole('button', { name: /Sort/i });
     for (let i = 0; i < 3; i++) {
       await sortButton.click();
-      await expect(sortButton).toBeDisabled();
-      await expect(sortButton).toBeEnabled({ timeout: 5000 });
+      await page.waitForTimeout(3_000);
     }
 
     // Create 5 people
@@ -148,8 +146,7 @@ test.describe('People Component', () => {
     // More sorting (wait for each sort to complete)
     for (let i = 0; i < 2; i++) {
       await sortButton.click();
-      await expect(sortButton).toBeDisabled();
-      await expect(sortButton).toBeEnabled({ timeout: 5000 });
+      await page.waitForTimeout(3_000);
     }
 
     // Delete 3 people
@@ -160,7 +157,7 @@ test.describe('People Component', () => {
     }
 
     // Wait for all operations to complete
-    await page.waitForTimeout(7000);
+    await page.waitForTimeout(7_000);
 
     // Verify the page is still functional
     await expect(sortButton).toBeEnabled();

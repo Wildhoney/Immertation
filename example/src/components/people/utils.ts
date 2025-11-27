@@ -1,128 +1,156 @@
 import { faker } from '@faker-js/faker';
 import { A } from '@mobily/ts-belt';
 import { notification } from 'antd';
-import { useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { State, Op } from '../../../../src';
-import type { Snapshot } from '../../../../src/types';
+import { type Model, Person, Direction } from './types';
 
-export type Person = {
-  id: string;
-  name: string;
-  age: number;
+/** Statistics for tracking pending operations */
+export type Statistics = {
+  sorting: boolean;
+  creating: number;
+  updating: number;
+  deleting: number;
+  total: number;
 };
 
-export type Model = {
-  people: Person[];
-};
-
+/** Initial model with 5 randomly generated people */
 export const model: Model = {
-  people: <Person[]> A.makeWithIndex(5, () => ({
-    id: State.pk(),
-    name: faker.person.firstName(),
-    age: faker.number.int({ min: 18, max: 80 }),
-  })),
+  people: [...A.makeWithIndex(5, Person.create)],
 };
 
+/**
+ * Simulates an async operation with a random delay.
+ * @returns Promise that resolves after 2-4 seconds
+ */
 function wait(): Promise<void> {
   const delay = faker.number.int({ min: 2_000, max: 4_000 });
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-function getPlacement(): 'topRight' | 'bottom' {
+/**
+ * Returns the notification placement based on screen width.
+ * @returns 'bottom' for mobile, 'topRight' for desktop
+ */
+function placement(): 'topRight' | 'bottom' {
   return window.innerWidth <= 768 ? 'bottom' : 'topRight';
 }
 
+/**
+ * React hook for managing the people list with optimistic updates.
+ * @returns Controller object with state and handler functions
+ */
 export function useController() {
-  const state = useMemo(
-    () =>
-      new State<Model>(model, (value: Snapshot<Model>) => {
-        if (Array.isArray(value)) return `people/${value.map((person) => person.id).join(',')}`;
-        if ('id' in value) return `person/${value.id}`;
-        return JSON.stringify(value);
-      }),
-    [],
-  );
+  const state = useMemo(() => new State<Model>(model), []);
   const [, rerender] = useReducer((x) => x + 1, 0);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [sorting, setSorting] = useState(false);
+  const [direction, setDirection] = useState(Direction.Asc);
 
-  const handleUpdate = async (id: string) => {
-    const name = faker.person.firstName();
+  useEffect(() => state.observe(() => rerender()), [state]);
 
-    const process = state.mutate((draft) => {
-      const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index].name = state.annotate(Op.Update, name);
-    });
-    rerender();
+  /**
+   * Updates a person's name with optimistic UI.
+   * @param id - The person's unique identifier
+   */
+  const handleUpdate = useCallback(
+    async (id: string) => {
+      const name = faker.person.firstName();
 
-    await wait();
+      const process = state.mutate((draft) => {
+        const index = Person.index(draft, id);
+        if (index !== -1) draft.people[index].name = state.annotate(Op.Update, name);
+      });
 
-    state.mutate((draft) => {
-      const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index].name = name;
-    });
-    state.prune(process);
-    rerender();
-  };
+      await wait();
 
-  const handleDelete = async (id: string) => {
-    const name = state.model.people.find((person) => person.id === id)?.name;
-    const process = state.mutate((draft) => {
-      const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people[index] = state.annotate(Op.Remove, draft.people[index]);
-    });
-    rerender();
+      state.mutate((draft) => {
+        const index = Person.index(draft, id);
+        if (index !== -1) draft.people[index].name = name;
+      });
+      state.prune(process);
+    },
+    [state],
+  );
 
-    await wait();
+  /**
+   * Deletes a person with optimistic UI.
+   * @param id - The person's unique identifier
+   */
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const name = state.model.people.find((person) => person.id === id)?.name;
+      const process = state.mutate((draft) => {
+        const index = Person.index(draft, id);
+        if (index !== -1) draft.people[index] = state.annotate(Op.Remove, draft.people[index]);
+      });
 
-    state.mutate((draft) => {
-      const index = draft.people.findIndex((person) => person.id === id);
-      if (index !== -1) draft.people.splice(index, 1);
-    });
-    state.prune(process);
-    rerender();
-    notification.success({ message: 'Deleted', description: `${name} deleted successfully`, placement: getPlacement() });
-  };
+      await wait();
 
-  const handleCreate = async () => {
-    const name = faker.person.firstName();
-    const id = State.pk();
-    const age = faker.number.int({ min: 18, max: 80 });
-    const newPerson: Person = { id, name, age };
+      state.mutate((draft) => {
+        const index = Person.index(draft, id);
+        if (index !== -1) draft.people.splice(index, 1);
+      });
+      state.prune(process);
+      notification.success({
+        message: 'Deleted',
+        description: `${name} deleted successfully`,
+        placement: placement(),
+      });
+    },
+    [state],
+  );
+
+  /**
+   * Creates a new person with optimistic UI.
+   */
+  const handleCreate = useCallback(async () => {
+    const newPerson = Person.create();
 
     const process = state.mutate((draft) => {
       draft.people.push(state.annotate(Op.Add, newPerson));
     });
-    rerender();
 
     await wait();
 
     state.prune(process);
-    rerender();
-    notification.success({ message: 'Created', description: `${name} created successfully`, placement: getPlacement() });
-  };
+    notification.success({
+      message: 'Created',
+      description: `${newPerson.name} created successfully`,
+      placement: placement(),
+    });
+  }, [state]);
 
-  const toggleSort = async () => {
-    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortOrder(newOrder);
-    setSorting(true);
+  /**
+   * Sorts the people list with optimistic UI.
+   */
+  const handleSort = useCallback(async () => {
+    const updated = direction === Direction.Asc ? Direction.Desc : Direction.Asc;
+    setDirection(updated);
 
     const process = state.mutate((draft) => {
       draft.people = state.annotate(Op.Sort, draft.people);
     });
-    rerender();
 
     await wait();
 
     state.mutate((draft) => {
       draft.people.sort((a, b) => {
-        return newOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        return updated === Direction.Asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       });
     });
     state.prune(process);
-    setSorting(false);
-    rerender();
-  };
+  }, [state, direction]);
 
-  return { state, sortOrder, sorting, handleUpdate, handleDelete, handleCreate, toggleSort };
+  const statistics: Statistics = useMemo(() => {
+    const sorting = state.inspect.people.is(Op.Sort);
+    const creating = state.model.people.filter((_, i) => state.inspect.people[i].is(Op.Add)).length;
+    const updating = state.model.people.filter((_, i) => state.inspect.people[i].name.pending()).length;
+    const deleting = state.model.people.filter((_, i) => state.inspect.people[i].is(Op.Remove)).length;
+    const total = state.model.people.length - creating - deleting;
+    return { sorting, creating, updating, deleting, total };
+  }, [state.model.people, state.inspect.people]);
+
+  return useMemo(
+    () => ({ state, direction, statistics, handleUpdate, handleDelete, handleCreate, handleSort }),
+    [state, direction, statistics, handleUpdate, handleDelete, handleCreate, handleSort],
+  );
 }

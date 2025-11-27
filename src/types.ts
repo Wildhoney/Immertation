@@ -1,5 +1,6 @@
 import type { Objectish, Patch } from 'immer';
-import { immerable } from 'immer';
+import { enablePatches, Immer, immerable } from 'immer';
+import { nanoid } from 'nanoid';
 
 /** Base model type that can be used with State */
 export type Model = Objectish;
@@ -13,8 +14,17 @@ export type Reconciliation<M extends Model> = {
 /** Property key for annotation tracking */
 export type Property = undefined | null | string | number;
 
-/** Recursive snapshot type for identity function */
-export type Snapshot<T> = T extends (infer U)[] ? T | Snapshot<U> : T extends object ? T | Snapshot<T[keyof T]> : never;
+/** Limits recursion depth for type instantiation (DepthLimiter[5]=4, DepthLimiter[4]=3, etc.) */
+type DepthLimiter = [never, 0, 1, 2, 3, 4, 5];
+
+/** Recursive snapshot type for identity function (limited depth to avoid infinite instantiation) */
+export type Snapshot<T, D extends number = 5> = [D] extends [0]
+  ? Extract<T, object>
+  : T extends (infer U)[]
+    ? T | Snapshot<U, DepthLimiter[D]>
+    : T extends object
+      ? T | Snapshot<T[keyof T], DepthLimiter[D]>
+      : never;
 
 /** Function that generates unique IDs from model snapshots */
 export type Identity<M extends Model> = (snapshot: Snapshot<M>) => Id;
@@ -111,3 +121,22 @@ export type Subscriber = () => void;
 
 /** Function to add or remove a subscriber */
 export type Subscribe = (subscriber: Subscriber) => void;
+
+/** Shared Immer instance with patches enabled and autoFreeze disabled */
+export class Config {
+  static immer = (() => {
+    enablePatches();
+    const immer = new Immer();
+    immer.setAutoFreeze(false);
+    return immer;
+  })();
+
+  /** String key for tagging objects */
+  static tag = 'κ' as const;
+
+  /** Generates a unique ID for tagging objects */
+  static id = nanoid;
+}
+
+/** Type for tagged objects */
+export type Tagged = { [Config.tag]?: string };

@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
-import { Op, State, type Id, type Snapshot } from '.';
-import { describe, expect, it } from 'vitest';
+import { Op, State } from '.';
+import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Tests for the State class which manages model mutations with annotations.
@@ -10,32 +10,23 @@ import { describe, expect, it } from 'vitest';
 describe('State', () => {
   type Model = {
     name: {
-      id: string;
       first: string;
       last: string;
     };
     age: number;
-    locations: { id: string; name: string }[];
+    locations: { name: string }[];
   };
 
   const model = {
     name: {
-      id: State.pk(),
       first: faker.person.firstName(),
       last: faker.person.lastName(),
     },
     age: faker.number.int({ min: 1, max: 100 }),
     locations: Array.from({ length: 3 }, () => ({
-      id: State.pk(),
       name: faker.location.city(),
     })),
   } satisfies Model;
-
-  function identity(snapshot: Snapshot<Model>): Id {
-    if (Array.isArray(snapshot)) return snapshot.map((item) => item.id).join(',');
-    if ('id' in snapshot) return snapshot.id;
-    return JSON.stringify(snapshot);
-  }
 
   /**
    * Tests for the mutate() method which applies changes to the model.
@@ -46,10 +37,10 @@ describe('State', () => {
     /**
      * Verifies that regular mutations update values directly without pending state,
      * while annotated mutations preserve originals and support nested annotations.
-     * Also confirms that annotations survive object spreading when identity is preserved.
+     * Spreading maintains identity, so annotations persist.
      */
     it('updates name + age', () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
 
       state.mutate((draft) => {
         draft.name.first = model.name.first + '!';
@@ -64,7 +55,7 @@ describe('State', () => {
         const name = faker.person.firstName();
         state.mutate((draft) => {
           draft.name = state.annotate(Op.Update, {
-            id: draft.name.id,
+            ...draft.name,
             first: 'A',
             last: state.annotate(Op.Update, 'T'),
           });
@@ -93,22 +84,29 @@ describe('State', () => {
         expect(state.model.name.last).toBe(last);
         expect(state.model.name.first).toBe(model.name.first + '!');
       }
+
+      {
+        const last = faker.person.lastName();
+        state.mutate((draft) => {
+          draft.name = { first: draft.name.first, last };
+        });
+
+        expect(state.inspect.name.first.pending()).toBe(false);
+        expect(state.model.name.last).toBe(last);
+      }
     });
 
     /**
-     * Verifies that annotated updates on array items preserve original values,
-     * and that annotations track correctly even after array mutations like sort.
-     * New items added with Op.Add are marked as pending.
+     * Verifies that annotated updates on array items preserve original values.
+     * New items added with Op.Add are tracked via their assigned identity.
      */
     it('updates locations', () => {
-      const state = new State<Model>(model, identity);
-      const id = model.locations[1].id;
+      const state = new State<Model>(model);
 
       {
         const city = faker.location.city();
         state.mutate((draft) => {
-          const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations[index].name = state.annotate(Op.Update, city);
+          draft.locations[1].name = state.annotate(Op.Update, city);
         });
         expect(state.model.locations[1].name).toBe(model.locations[1].name);
         expect(state.inspect.locations[1].name.pending()).toBe(true);
@@ -117,25 +115,20 @@ describe('State', () => {
 
       const city = faker.location.city();
       state.mutate((draft) => {
-        draft.locations.sort();
-        draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: city }));
+        draft.locations.push(state.annotate(Op.Add, { name: city }));
       });
 
-      const index = state.model.locations.findIndex((location) => location.id === id);
-      expect(state.model.locations[index].name).toBe(model.locations[1].name);
-      expect(state.inspect.locations[index].name.pending()).toBe(true);
-
+      expect(state.inspect.locations[1].name.pending()).toBe(true);
       expect(state.model.locations[3].name).toBe(city);
       expect(state.inspect.locations[3].pending()).toBe(true);
     });
 
     /**
-     * Verifies that annotations persist when the entire array is replaced,
-     * as long as the annotated item maintains its identity (same id).
+     * Verifies that annotations are lost when objects are replaced without spreading,
+     * since new objects receive new identities.
      */
-    it('replaces locations', () => {
-      const state = new State<Model>(model, identity);
-      const id = model.locations[0].id;
+    it('replaces locations (annotations lost)', () => {
+      const state = new State<Model>(model);
 
       state.mutate((draft) => {
         draft.locations[0].name = state.annotate(Op.Update, 'Pending City');
@@ -143,63 +136,58 @@ describe('State', () => {
       expect(state.inspect.locations[0].name.pending()).toBe(true);
 
       state.mutate((draft) => {
-        const kept = draft.locations[0];
-        draft.locations = [
-          kept,
-          { id: State.pk(), name: faker.location.city() },
-          { id: State.pk(), name: faker.location.city() },
-        ];
+        draft.locations = [{ name: faker.location.city() }, { name: faker.location.city() }];
       });
 
-      const index = state.model.locations.findIndex((location) => location.id === id);
-      expect(index).toBe(0);
+      expect(state.inspect.locations[0].name.pending()).toBe(false);
+    });
+
+    /**
+     * Verifies that annotations persist when objects are spread, preserving identity.
+     */
+    it('replaces locations (annotations persist with spread)', () => {
+      const state = new State<Model>(model);
+
+      state.mutate((draft) => {
+        draft.locations[0].name = state.annotate(Op.Update, 'Pending City');
+      });
+      expect(state.inspect.locations[0].name.pending()).toBe(true);
+
+      state.mutate((draft) => {
+        draft.locations = [{ ...draft.locations[0] }, { name: faker.location.city() }];
+      });
+
       expect(state.inspect.locations[0].name.pending()).toBe(true);
     });
 
     /**
-     * Verifies Op.Add marks new items as pending, Op.Remove marks existing items
-     * for removal while keeping them in the model, and splice() physically removes
-     * items from the array without annotation.
+     * Verifies Op.Remove marks items for removal while keeping them in the model,
+     * and splice() physically removes items from the array.
      */
-    it('adds + removes locations', () => {
-      const state = new State<Model>(model, identity);
-
-      const city = faker.location.city();
-      state.mutate((draft) => {
-        draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: city }));
-      });
-      expect(state.model.locations.length).toBe(4);
-      expect(state.model.locations[3].name).toBe(city);
-      expect(state.inspect.locations[3].pending()).toBe(true);
+    it('removes locations', () => {
+      const state = new State<Model>(model);
 
       {
-        const id = model.locations[1].id;
         state.mutate((draft) => {
-          const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations[index] = state.annotate(Op.Remove, draft.locations[index]);
+          draft.locations[1] = state.annotate(Op.Remove, { ...draft.locations[1] });
         });
-        expect(state.model.locations.length).toBe(4);
-        expect(state.model.locations.find((location) => location.id === id)).toBeDefined();
+        expect(state.model.locations.length).toBe(3);
         expect(state.inspect.locations[1].pending()).toBe(true);
       }
 
       {
-        const id = model.locations[0].id;
         state.mutate((draft) => {
-          const index = draft.locations.findIndex((location) => location.id === id);
-          draft.locations.splice(index, 1);
+          draft.locations.splice(0, 1);
         });
-        expect(state.model.locations.length).toBe(3);
-        expect(state.model.locations.find((location) => location.id === id)).toBeUndefined();
+        expect(state.model.locations.length).toBe(2);
       }
     });
 
     /**
-     * Verifies that combined operation bitmasks work correctly with is(),
-     * allowing multiple operations to be checked simultaneously.
+     * Verifies that combined operation bitmasks work correctly with is().
      */
     it('supports combined operations bitmask', () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
 
       state.mutate((draft) => {
         draft.name.first = state.annotate(Op.Update | Op.Replace, 'Combined');
@@ -215,16 +203,13 @@ describe('State', () => {
 
   /**
    * Tests for the prune() method which removes annotations by process symbol.
-   * Each mutate() call returns a unique process symbol that can be used to
-   * clean up annotations after async operations complete.
    */
   describe('prune()', () => {
     /**
-     * Verifies that prune() removes all annotations associated with a specific
-     * process symbol, returning the inspect state to non-pending.
+     * Verifies that prune() removes all annotations associated with a process symbol.
      */
     it('removes annotations by process', () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
 
       const process = state.mutate((draft) => {
         draft.name.first = state.annotate(Op.Update, 'Pending');
@@ -239,15 +224,14 @@ describe('State', () => {
   });
 
   /**
-   * Tests for the settled() method which returns a promise that resolves
-   * when no more annotations exist at a given path.
+   * Tests for the settled() method which resolves when annotations are cleared.
    */
   describe('settled()', () => {
     /**
-     * Verifies that settled() resolves with the current model value once there are no more annotations.
+     * Verifies that settled() resolves with the model value once annotations are pruned.
      */
     it('resolves when there are no more annotations', async () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
       const value = faker.person.firstName();
 
       const process = state.mutate((draft) => {
@@ -268,15 +252,15 @@ describe('State', () => {
      * Verifies that settled() resolves immediately if no annotations exist.
      */
     it('resolves immediately when no annotations', async () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
       expect(await state.inspect.name.first.settled()).toBe(model.name.first);
     });
 
     /**
-     * Verifies that settled() only resolves when ALL annotations are pruned, not just some.
+     * Verifies that settled() waits for all annotations to be pruned.
      */
     it('waits for all annotations to be pruned', async () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
       const value = faker.person.firstName();
 
       const process1 = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
@@ -296,19 +280,75 @@ describe('State', () => {
   });
 
   /**
+   * Tests for the observe() method which subscribes to model changes.
+   */
+  describe('observe()', () => {
+    /**
+     * Verifies that observe() calls the callback on mutate().
+     */
+    it('calls callback on mutate', () => {
+      const state = new State<Model>(model);
+      const callback = vi.fn();
+
+      state.observe(callback);
+      expect(callback).not.toHaveBeenCalled();
+
+      state.mutate((draft) => void (draft.age = 99));
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(state.model);
+    });
+
+    /**
+     * Verifies that observe() calls the callback on prune().
+     */
+    it('calls callback on prune', () => {
+      const state = new State<Model>(model);
+      const callback = vi.fn();
+
+      state.observe(callback);
+
+      const process = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, 'Pending')));
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      state.prune(process);
+      expect(callback).toHaveBeenCalledTimes(2);
+    });
+
+    /**
+     * Verifies that the unsubscribe function stops callbacks.
+     */
+    it('unsubscribes when returned function is called', () => {
+      const state = new State<Model>(model);
+      const callback = vi.fn();
+
+      const unsubscribe = state.observe(callback);
+      state.mutate((draft) => void (draft.age = 50));
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+      state.mutate((draft) => void (draft.age = 60));
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
    * Tests for Greek letter shorthand aliases.
    */
   describe('aliases', () => {
-    /** Verifies that κ is an alias for pk. */
+    /**
+     * Verifies that κ is an alias for pk.
+     */
     it('κ generates unique ids like pk', () => {
       const id = State.κ();
       expect(typeof id).toBe('string');
       expect(id.length).toBeGreaterThan(0);
     });
 
-    /** Verifies that δ is an alias for annotate. */
+    /**
+     * Verifies that δ is an alias for annotate.
+     */
     it('δ annotates values like annotate', () => {
-      const state = new State<Model>(model, identity);
+      const state = new State<Model>(model);
 
       state.mutate((draft) => {
         draft.name.first = state.δ(Op.Update, 'Pending');

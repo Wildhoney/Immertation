@@ -11,7 +11,7 @@ import {
   type Registry,
   type Subscriber,
 } from './types';
-import { Config, inspect, reconcile } from './utils';
+import * as utils from './utils';
 import clone from 'lodash/cloneDeep';
 import { A } from '@mobily/ts-belt';
 
@@ -32,10 +32,10 @@ export class State<M extends Model> {
   /**
    * Creates a new State instance.
    * @param {M} model - The initial model state
-   * @param {Identity<M>} identity - Function to generate unique IDs for snapshots
+   * @param {Identity<M>} [identity] - Optional function to generate unique IDs for snapshots
    */
-  constructor(model: M, identity: Identity<M>) {
-    this.#model = model;
+  constructor(model: M, identity: Identity<M> = utils.identity) {
+    this.#model = utils.tag(model);
     this.#identity = identity;
   }
 
@@ -77,7 +77,7 @@ export class State<M extends Model> {
    * @returns {Inspect<M>} Proxy with pending(), is(), draft(), and settled() methods
    */
   get inspect(): Inspect<M> {
-    return inspect(
+    return utils.inspect(
       () => this.#model,
       this.#registry,
       this.#identity,
@@ -93,21 +93,24 @@ export class State<M extends Model> {
    */
   mutate(recipe: Recipe<M>): Process {
     const process = Symbol('process');
-    const [, patches] = Config.immer.produceWithPatches(clone(this.#model), recipe);
+    const [, patches] = utils.Config.immer.produceWithPatches(clone(this.#model), recipe);
 
-    this.#model = Config.immer.applyPatches(
+    this.#model = utils.Config.immer.applyPatches(
       this.#model,
       patches.reduce<Reconciliation<M>>(
         (context, patch) => {
-          const value = reconcile(patch, context.snapshot, process, this.#registry, this.#identity);
+          const value = utils.reconcile(patch, context.snapshot, process, this.#registry, this.#identity);
           return {
-            snapshot: Config.immer.applyPatches(context.snapshot, [{ ...patch, value }]),
+            snapshot: utils.Config.immer.applyPatches(context.snapshot, [{ ...patch, value }]),
             patches: [...context.patches, { ...patch, value }],
           };
         },
         { snapshot: clone(this.#model), patches: [] },
       ).patches,
     );
+
+    this.#model = utils.tag(this.#model);
+    this.#subscribers.forEach((subscriber) => subscriber());
 
     return process;
   }
@@ -124,6 +127,17 @@ export class State<M extends Model> {
     });
     this.#subscribers.forEach((subscriber) => subscriber());
   }
+
+  /**
+   * Subscribes to model changes.
+   * @param {(model: M) => void} callback - Function called with the model on every change
+   * @returns {() => void} Unsubscribe function
+   */
+  observe(callback: (model: M) => void): () => void {
+    const subscriber = () => callback(this.#model);
+    this.#subscribers.add(subscriber);
+    return () => this.#subscribers.delete(subscriber);
+  }
 }
 
-export { Operation, Operation as Op, type Id, type Identity, type Snapshot } from './types';
+export { Operation, Operation as Op, type Id, type Identity, type Inspect, type Snapshot } from './types';

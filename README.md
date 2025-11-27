@@ -23,9 +23,9 @@ Operations are particularly useful for async operations and optimistic updates, 
 - [Getting started](#getting-started)
   - [Using annotations](#using-annotations)
   - [Available operations](#available-operations)
-  - [Identity function](#identity-function)
   - [Inspecting state](#inspecting-state)
   - [Pruning annotations](#pruning-annotations)
+  - [Identity function](#custom-identity-function)
 
 ## Getting started
 
@@ -37,10 +37,7 @@ type Model = {
   age: number;
 };
 
-const state = new State<Model>(
-  { name: 'Imogen', age: 30 },
-  (snapshot) => JSON.stringify(snapshot)
-);
+const state = new State<Model>({ name: 'Imogen', age: 30 });
 
 state.mutate((draft) => {
   draft.name = 'Phoebe';
@@ -102,27 +99,6 @@ state.mutate((draft) => {
 state.mutate((draft) => void (draft.user.name = state.annotate(Op.Update, 'Phoebe')));
 ```
 
-### Identity function
-
-The identity function provides stable keys for tracking values across mutations. It receives any value from your model and should return a unique string identifier:
-
-```typescript
-type Person = { id: string; name: string };
-type Model = { people: Person[] };
-
-const state = new State<Model>(
-  { people: [] },
-  (snapshot) => {
-    // Handle different value types
-    if ('id' in snapshot) return snapshot.id;
-    if (Array.isArray(snapshot)) return snapshot.map((p) => p.id).join(',');
-    return JSON.stringify(snapshot);
-  }
-);
-```
-
-This allows annotations to follow values even when arrays are sorted or reordered.
-
 ### Inspecting state
 
 The `inspect` property provides a proxy to check pending operations at any path:
@@ -157,4 +133,16 @@ const process = state.mutate((draft) => void (draft.name = state.annotate(Op.Upd
 
 // After async operation completes
 state.prune(process);
+```
+
+### Identity function
+
+By default, Immertation tracks object identity using an internal `κ` property &mdash; you typically don't need to configure this. However, if you need custom identity tracking (e.g., using your own `id` fields), you can optionally pass a custom identity function as the second argument to `State`:
+
+```typescript
+const state = new State<Model>(model, (snapshot) => {
+  if ('id' in snapshot) return snapshot.id;
+  if (Array.isArray(snapshot)) return snapshot.map((item) => item.id).join(',');
+  return JSON.stringify(snapshot);
+});
 ```

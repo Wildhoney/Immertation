@@ -1,15 +1,6 @@
-import { css, keyframes } from '@emotion/react';
+import { css } from '@emotion/react';
 
-export const spin = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
-
-export const globalStyles = css`
+export const reset = css`
   @import url('https://fonts.googleapis.com/css2?family=Foldit:wght@100..900&display=swap');
 
   * {
@@ -37,7 +28,7 @@ export const globalStyles = css`
   }
 `;
 
-export const wrapper = css`
+export const layout = css`
   width: 700px;
   margin: 40px auto;
   display: flex;
@@ -63,14 +54,14 @@ export const container = css`
   min-height: 0;
 `;
 
-export const buttonGroup = css`
+export const buttons = css`
   margin-bottom: 16px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
 `;
 
-export const statsGroup = css`
+export const stats = css`
   display: flex;
   justify-content: center;
   gap: 8px;
@@ -78,7 +69,7 @@ export const statsGroup = css`
   flex-shrink: 0;
 `;
 
-export const statBadge = css`
+export const badge = css`
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -89,35 +80,17 @@ export const statBadge = css`
   color: #595959;
 `;
 
-export const listContainer = css`
+export const list = css`
   flex: 1;
   overflow-y: auto;
 `;
 
-export const spinningLoader = css`
-  animation: ${spin} 1s linear infinite;
-  color: #1890ff;
-`;
-
-export const userIcon = css`
-  color: #000000;
-`;
-
-export const creatingText = css`
+export const muted = css`
   font-style: italic;
   color: #8c8c8c;
 `;
 
-export const secondaryText = css`
-  font-size: 14px;
-`;
-
-export const creatingSecondaryText = css`
-  font-size: 14px;
-  font-style: italic;
-`;
-
-export const cornerLinks = css`
+export const links = css`
   position: fixed;
   left: 24px;
   top: 24px;
@@ -126,7 +99,7 @@ export const cornerLinks = css`
   gap: 8px;
 `;
 
-export const cornerLink = css`
+export const link = css`
   display: flex;
   align-items: center;
   gap: 8px;
