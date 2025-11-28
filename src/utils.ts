@@ -109,12 +109,14 @@ export function inspect<M extends Model>(
   function annotations(path: string[]): Annotation<M>[] {
     const key = path.at(-1);
     const target = get(model(), path);
-    const parent = get(model(), path.slice(0, -1));
+    const context = path.slice(0, -1);
+    const parent = A.isNotEmpty(context) ? get(model(), context) : model();
 
     const object =
       G.isObject(target) || G.isArray(target)
         ? (registry.get(identity(target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
         : [];
+
     const property = G.isObject(parent)
       ? (registry.get(identity(parent))?.filter((annotation) => annotation.property === key) ?? [])
       : [];
@@ -176,8 +178,11 @@ export function reconcile<M extends Model>(
         .forEach(([key, value]) => discover(<M>value, path.concat(key)));
 
       if (primitive(model.value)) {
-        const context = get(snapshot, path.slice(0, -1).join('.'));
-        register(context, model, path.at(-1), process, registry, identity);
+        const parentPath = path.slice(0, -1);
+        const context = parentPath.length > 0 ? get(snapshot, parentPath.join('.')) : snapshot;
+        if (!G.isNullable(context)) {
+          register(context, model, path.at(-1), process, registry, identity);
+        }
         return value ?? <M>(<unknown>model.value);
       }
 

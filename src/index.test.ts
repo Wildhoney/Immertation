@@ -359,5 +359,30 @@ describe('State', () => {
 
       expect(state.inspect.name.first.pending()).toBe(true);
     });
+
+    /**
+     * Verifies that annotating a primitive value on the root model works correctly.
+     * This is a common pattern when the root model has primitive properties.
+     */
+    it('annotates primitive value on root model', () => {
+      type Model = { count: number };
+      const model: Model = { count: 1 };
+      const state = new State<Model>(model);
+
+      const process = state.mutate((draft) => {
+        const newValue = draft.count + 1;
+        draft.count = state.annotate(Op.Update, newValue);
+      });
+
+      expect(state.model.count).toBe(1);
+      expect(state.inspect.count.pending()).toBe(true);
+      expect(state.inspect.count.draft()).toBe(2);
+
+      state.mutate((draft) => void (draft.count = 2));
+      state.prune(process);
+
+      expect(state.inspect.count.pending()).toBe(false);
+      expect(state.model.count).toBe(2);
+    });
   });
 });
