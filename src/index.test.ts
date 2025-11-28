@@ -268,13 +268,16 @@ describe('State', () => {
 
       const name = state.inspect.name.first.settled();
       expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.inspect.name.first.remaining()).toBe(2);
 
       state.prune(process1);
       expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.inspect.name.first.remaining()).toBe(1);
 
       state.mutate((draft) => void (draft.name.first = value));
       state.prune(process2);
 
+      expect(state.inspect.name.first.remaining()).toBe(0);
       expect(await name).toBe(value);
     });
   });

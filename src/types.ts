@@ -52,6 +52,8 @@ export type Path = (string | number)[];
 type Inspectors<T = unknown> = {
   /** Returns true if any pending annotations exist */
   pending(): boolean;
+  /** Returns the count of pending annotations at this path */
+  remaining(): number;
   /** Returns true if annotation matches the given operation */
   is(operation: Operation): boolean;
   /** Returns the draft value from the latest annotation, or the actual value from the model */

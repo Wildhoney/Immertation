@@ -126,6 +126,7 @@ export function inspect<M extends Model>(
     return <Inspect<M>>(<unknown>new Proxy(() => {}, {
       get(_, property) {
         if (property === 'pending') return () => !A.isEmpty(annotations(path));
+        if (property === 'remaining') return () => A.length(annotations(path));
         if (property === 'is')
           return (operation: Operation) =>
             annotations(path).some((annotation) => (annotation.operation & operation) !== 0);
