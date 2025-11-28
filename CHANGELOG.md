@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.12](https://github.com/Wildhoney/Immertation/compare/v0.1.11...v0.1.12) (2025-11-28)
+
+
+### Features
+
+* added inspect.remaining check ([3e47393](https://github.com/Wildhoney/Immertation/commit/3e47393a2518502ff04fde17b34dd26e1f2156df))
+
+
+### Bug Fixes
+
+* pnpm version ([d6e0602](https://github.com/Wildhoney/Immertation/commit/d6e06028b4b66c28d3bd13cef7be9b438eee0ad9))
+
 ## [0.1.11](https://github.com/Wildhoney/Immertation/compare/v0.1.9...v0.1.11) (2025-11-27)
 
 
