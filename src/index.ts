@@ -137,4 +137,4 @@ export class State<M extends Model> {
   }
 }
 
-export { Operation, Operation as Op, type Id, type Identity, type Inspect, type Snapshot } from './types';
+export { Operation, Operation as Op, type Id, type Identity, type Inspect, type Snapshot, type Process } from './types';
