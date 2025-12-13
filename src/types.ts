@@ -61,7 +61,7 @@ type Inspectors<T = unknown> = {
   /** Returns a promise that resolves with the value when no more annotations exist at this path */
   settled(): Promise<T>;
   /** Returns the current model value and an inspect proxy for this path */
-  box(): { value: T; inspect: Inspect<T> };
+  box(): Box<T>;
 };
 
 /**
@@ -145,3 +145,6 @@ export class Config {
 
 /** Type for tagged objects */
 export type Tagged = { [Config.tag]?: string };
+
+/** Return type from inspect's box() method */
+export type Box<T> = { value: T; inspect: Inspect<T> };
