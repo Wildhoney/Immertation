@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.16](https://github.com/Wildhoney/Immertation/compare/v0.1.15...v0.1.16) (2025-12-13)
+
+
+### Features
+
+* added box() function ([9f1fac3](https://github.com/Wildhoney/Immertation/commit/9f1fac39aa7bf7dc6d9b7be40b57e5ca987fac32))
+
 ## [0.1.15](https://github.com/Wildhoney/Immertation/compare/v0.1.14...v0.1.15) (2025-12-04)
 
 ## [0.1.14](https://github.com/Wildhoney/Immertation/compare/v0.1.13...v0.1.14) (2025-11-28)

@@ -1,6 +1,6 @@
 {
   "name": "immertation",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "packageManager": "pnpm@10.24.0",
   "license": "MIT",
   "type": "module",
