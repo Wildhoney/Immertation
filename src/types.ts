@@ -60,6 +60,8 @@ type Inspectors<T = unknown> = {
   draft(): T | undefined;
   /** Returns a promise that resolves with the value when no more annotations exist at this path */
   settled(): Promise<T>;
+  /** Returns the current model value and an inspect proxy for this path */
+  box(): { value: T; inspect: Inspect<T> };
 };
 
 /**

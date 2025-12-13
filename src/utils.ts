@@ -129,6 +129,7 @@ export function inspect<M extends Model>(
       get(_, property) {
         if (property === 'pending') return () => !A.isEmpty(annotations(path));
         if (property === 'remaining') return () => A.length(annotations(path));
+        if (property === 'box') return () => ({ value: get(model(), path), inspect: proxy(path) });
         if (property === 'is')
           return (operation: Operation) =>
             annotations(path).some((annotation) => (annotation.operation & operation) !== 0);
