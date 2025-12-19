@@ -384,5 +384,68 @@ describe('State', () => {
       expect(state.inspect.count.pending()).toBe(false);
       expect(state.model.count).toBe(2);
     });
+
+    /**
+     * Verifies that rapid concurrent annotations accumulate correctly.
+     * Each mutation should see the most recent draft value, not stale data.
+     * This simulates rapidly clicking a + button multiple times.
+     */
+    it('accumulates concurrent annotations correctly', () => {
+      type Model = { count: number };
+      const model: Model = { count: 1 };
+      const state = new State<Model>(model);
+
+      // Simulate rapid clicks - each reads draft() and increments by 1
+      const processes: symbol[] = [];
+
+      // Click 1: draft() = 1 (no annotations), annotate with 2
+      processes.push(
+        state.mutate((draft) => {
+          const current = state.inspect.count.draft() ?? draft.count;
+          draft.count = state.annotate(Op.Update, current + 1);
+        }),
+      );
+      expect(state.model.count).toBe(1); // Model unchanged
+      expect(state.inspect.count.remaining()).toBe(1);
+      expect(state.inspect.count.draft()).toBe(2);
+
+      // Click 2: draft() = 2 (from first annotation), annotate with 3
+      processes.push(
+        state.mutate((draft) => {
+          const current = state.inspect.count.draft() ?? draft.count;
+          draft.count = state.annotate(Op.Update, current + 1);
+        }),
+      );
+      expect(state.model.count).toBe(1); // Model still unchanged
+      expect(state.inspect.count.remaining()).toBe(2);
+      expect(state.inspect.count.draft()).toBe(3); // Should be 3, not 2!
+
+      // Click 3: draft() = 3 (from second annotation), annotate with 4
+      processes.push(
+        state.mutate((draft) => {
+          const current = state.inspect.count.draft() ?? draft.count;
+          draft.count = state.annotate(Op.Update, current + 1);
+        }),
+      );
+      expect(state.model.count).toBe(1); // Model still unchanged
+      expect(state.inspect.count.remaining()).toBe(3);
+      expect(state.inspect.count.draft()).toBe(4); // Should be 4, not 2!
+
+      // Click 4: draft() = 4 (from third annotation), annotate with 5
+      processes.push(
+        state.mutate((draft) => {
+          const current = state.inspect.count.draft() ?? draft.count;
+          draft.count = state.annotate(Op.Update, current + 1);
+        }),
+      );
+      expect(state.model.count).toBe(1); // Model still unchanged
+      expect(state.inspect.count.remaining()).toBe(4);
+      expect(state.inspect.count.draft()).toBe(5); // Should be 5, not 2!
+
+      // Verify all processes can be pruned properly
+      processes.forEach((p) => state.prune(p));
+      expect(state.inspect.count.remaining()).toBe(0);
+      expect(state.inspect.count.draft()).toBe(1); // Back to model value
+    });
   });
 });

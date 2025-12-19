@@ -57,7 +57,7 @@ type Inspectors<T = unknown> = {
   /** Returns true if annotation matches the given operation */
   is(operation: Operation): boolean;
   /** Returns the draft value from the latest annotation, or the actual value from the model */
-  draft(): T | undefined;
+  draft(): T;
   /** Returns a promise that resolves with the value when no more annotations exist at this path */
   settled(): Promise<T>;
   /** Returns the current model value and an inspect proxy for this path */
