@@ -133,7 +133,7 @@ export function inspect<M extends Model>(
         if (property === 'is')
           return (operation: Operation) =>
             annotations(path).some((annotation) => (annotation.operation & operation) !== 0);
-        if (property === 'draft') return () => A.last(annotations(path))?.value ?? get(model(), path);
+        if (property === 'draft') return () => A.head(annotations(path))?.value ?? get(model(), path);
         if (property === 'settled')
           return () =>
             new Promise((resolve) => {

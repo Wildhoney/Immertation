@@ -127,11 +127,11 @@ describe('box()', () => {
       expect(state.inspect.name.first.draft()).toBe(name);
     });
 
-    it('returns first annotated value when multiple annotations exist', () => {
+    it('returns most recent annotated value when multiple annotations exist', () => {
       const state = new State<Model>(model);
       state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, 'First')));
       state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, 'Second')));
-      expect(state.inspect.name.first.draft()).toBe('First');
+      expect(state.inspect.name.first.draft()).toBe('Second');
       expect(state.inspect.name.first.remaining()).toBe(2);
     });
 
