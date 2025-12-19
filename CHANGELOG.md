@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.18](https://github.com/Wildhoney/Immertation/compare/v0.1.17...v0.1.18) (2025-12-19)
+
+
+### Bug Fixes
+
+* issue with the draft() returning the oldest annotation ([40fcdfe](https://github.com/Wildhoney/Immertation/commit/40fcdfedf3672bf002d069e217c3e0c26e07bb0d))
+
 ## [0.1.17](https://github.com/Wildhoney/Immertation/compare/v0.1.16...v0.1.17) (2025-12-13)
 
 ## [0.1.16](https://github.com/Wildhoney/Immertation/compare/v0.1.15...v0.1.16) (2025-12-13)
