@@ -39,6 +39,14 @@ export enum Operation {
   Sort = 32,
 }
 
+/** Mode for reconcile function */
+export enum Mode {
+  /** Mutations via produce() - preserve original values, store annotations */
+  Produce,
+  /** Hydration - annotation values become actual values */
+  Hydrate,
+}
+
 /** String identifier for registry keys */
 export type Id = string;
 

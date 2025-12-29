@@ -44,9 +44,10 @@ type Model = {
   age: number;
 };
 
-const state = new State<Model>({ name: 'Imogen', age: 30 });
+const state = new State<Model>();
+state.hydrate({ name: 'Imogen', age: 30 });
 
-state.mutate((draft) => {
+state.produce((draft) => {
   draft.name = 'Phoebe';
   draft.age = 31;
 });
@@ -66,7 +67,7 @@ Annotations allow you to track pending changes. This is especially useful for op
 import { State, Op } from 'immertation';
 
 // Annotate a value to mark it as pending
-state.mutate((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
+state.produce((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
 
 // The model retains the original value
 console.log(state.model.name); // 'Imogen'
@@ -75,7 +76,7 @@ console.log(state.model.name); // 'Imogen'
 console.log(state.inspect.name.pending()); // true
 
 // Later, commit the actual change
-state.mutate((draft) => void (draft.name = 'Phoebe'));
+state.produce((draft) => void (draft.name = 'Phoebe'));
 
 console.log(state.model.name); // 'Phoebe'
 console.log(state.inspect.name.pending()); // false
@@ -94,16 +95,16 @@ The `Op` enum provides operation types for annotations:
 
 ```typescript
 // Adding a new item
-state.mutate((draft) => void draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: 'Horsham' })));
+state.produce((draft) => void draft.locations.push(state.annotate(Op.Add, { id: State.pk(), name: 'Horsham' })));
 
 // Marking for removal (keeps item until actually removed)
-state.mutate((draft) => {
+state.produce((draft) => {
   const index = draft.locations.findIndex((loc) => loc.id === id);
   draft.locations[index] = state.annotate(Op.Remove, draft.locations[index]);
 });
 
 // Updating a property
-state.mutate((draft) => void (draft.user.name = state.annotate(Op.Update, 'Phoebe')));
+state.produce((draft) => void (draft.user.name = state.annotate(Op.Update, 'Phoebe')));
 ```
 
 ### Inspecting state
@@ -136,7 +137,7 @@ state.inspect.locations[0].name.pending();
 Remove annotations by process after async operations complete:
 
 ```typescript
-const process = state.mutate((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
+const process = state.produce((draft) => void (draft.name = state.annotate(Op.Update, 'Phoebe')));
 
 // After async operation completes
 state.prune(process);
@@ -157,10 +158,10 @@ unsubscribe();
 
 ### Identity function
 
-By default, Immertation tracks object identity using an internal `κ` property &mdash; you typically don't need to configure this. However, if you need custom identity tracking (e.g., using your own `id` fields), you can optionally pass a custom identity function as the second argument to `State`:
+By default, Immertation tracks object identity using an internal `κ` property &mdash; you typically don't need to configure this. However, if you need custom identity tracking (e.g., using your own `id` fields), you can optionally pass a custom identity function to the `State` constructor:
 
 ```typescript
-const state = new State<Model>(model, (snapshot) => {
+const state = new State<Model>((snapshot) => {
   if ('id' in snapshot) return snapshot.id;
   if (Array.isArray(snapshot)) return snapshot.map((item) => item.id).join(',');
   return JSON.stringify(snapshot);

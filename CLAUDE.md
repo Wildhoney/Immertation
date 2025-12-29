@@ -8,15 +8,17 @@ A state management library that tracks model mutations with annotations using Im
 
 The main entry point. Wraps a model and provides:
 
-- `mutate(recipe)` - Apply mutations to the model using Immer's draft pattern
+- `produce(recipe)` - Apply mutations to the model using Immer's draft pattern
+- `hydrate(model)` - Initialize the model (can include annotations)
 - `model` - Access the current state
 - `inspect` - Proxy-based API to check if properties have pending annotations
 - `registry` - Map of identity → annotations for tracking pending changes
 
 ```typescript
-const state = new State<Model>(model, identity);
-state.mutate((draft) => {
-  draft.name = State.annotate({ first: 'New' }, Op.Update);
+const state = new State<Model>(identity);
+state.hydrate(model);
+state.produce((draft) => {
+  draft.name = state.annotate(Op.Update, { first: 'New' });
 });
 state.inspect.name.pending(); // true
 ```
@@ -69,8 +71,8 @@ Processes Immer patches to extract annotations and return clean values:
 
 When you do:
 ```typescript
-draft.name = State.annotate({ first: 'A' }, Op.Update);
-draft.name.first = State.annotate('B', Op.Update);
+draft.name = state.annotate(Op.Update, { first: 'A' });
+draft.name.first = state.annotate(Op.Update, 'B');
 ```
 
 The second annotation gets added as a property on the first Annotation object (because `[immerable] = true`). The reconcile function detects this by filtering `Object.entries(model)` for keys not in `Annotation.keys`.

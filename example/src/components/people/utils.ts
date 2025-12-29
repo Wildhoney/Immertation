@@ -41,7 +41,11 @@ function placement(): 'topRight' | 'bottom' {
  * @returns Controller object with state and handler functions
  */
 export function useController() {
-  const state = useMemo(() => new State<Model>(model), []);
+  const state = useMemo(() => {
+    const state = new State<Model>();
+    state.hydrate(model);
+    return state;
+  }, []);
   const [, rerender] = useReducer((x) => x + 1, 0);
   const [direction, setDirection] = useState(Direction.Asc);
 
@@ -55,14 +59,14 @@ export function useController() {
     async (id: string) => {
       const name = faker.person.firstName();
 
-      const process = state.mutate((draft) => {
+      const process = state.produce((draft) => {
         const index = Person.index(draft, id);
         if (index !== -1) draft.people[index].name = state.annotate(Op.Update, name);
       });
 
       await wait();
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         const index = Person.index(draft, id);
         if (index !== -1) draft.people[index].name = name;
       });
@@ -78,14 +82,14 @@ export function useController() {
   const handleDelete = useCallback(
     async (id: string) => {
       const name = state.model.people.find((person) => person.id === id)?.name;
-      const process = state.mutate((draft) => {
+      const process = state.produce((draft) => {
         const index = Person.index(draft, id);
         if (index !== -1) draft.people[index] = state.annotate(Op.Remove, draft.people[index]);
       });
 
       await wait();
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         const index = Person.index(draft, id);
         if (index !== -1) draft.people.splice(index, 1);
       });
@@ -105,7 +109,7 @@ export function useController() {
   const handleCreate = useCallback(async () => {
     const newPerson = Person.create();
 
-    const process = state.mutate((draft) => {
+    const process = state.produce((draft) => {
       draft.people.push(state.annotate(Op.Add, newPerson));
     });
 
@@ -126,13 +130,13 @@ export function useController() {
     const updated = direction === Direction.Asc ? Direction.Desc : Direction.Asc;
     setDirection(updated);
 
-    const process = state.mutate((draft) => {
+    const process = state.produce((draft) => {
       draft.people = state.annotate(Op.Sort, draft.people);
     });
 
     await wait();
 
-    state.mutate((draft) => {
+    state.produce((draft) => {
       draft.people.sort((a, b) => {
         return updated === Direction.Asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       });

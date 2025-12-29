@@ -40,9 +40,10 @@ describe('State', () => {
      * Spreading maintains identity, so annotations persist.
      */
     it('updates name + age', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.name.first = model.name.first + '!';
         draft.age += 1;
       });
@@ -53,7 +54,7 @@ describe('State', () => {
 
       {
         const name = faker.person.firstName();
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.name = state.annotate(Op.Update, {
             ...draft.name,
             first: 'A',
@@ -76,7 +77,7 @@ describe('State', () => {
 
       {
         const last = faker.person.lastName();
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.name = { ...draft.name, last };
         });
 
@@ -87,7 +88,7 @@ describe('State', () => {
 
       {
         const last = faker.person.lastName();
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.name = { first: draft.name.first, last };
         });
 
@@ -101,11 +102,12 @@ describe('State', () => {
      * New items added with Op.Add are tracked via their assigned identity.
      */
     it('updates locations', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
       {
         const city = faker.location.city();
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.locations[1].name = state.annotate(Op.Update, city);
         });
         expect(state.model.locations[1].name).toBe(model.locations[1].name);
@@ -114,7 +116,7 @@ describe('State', () => {
       }
 
       const city = faker.location.city();
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.locations.push(state.annotate(Op.Add, { name: city }));
       });
 
@@ -128,14 +130,15 @@ describe('State', () => {
      * since new objects receive new identities.
      */
     it('replaces locations (annotations lost)', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.locations[0].name = state.annotate(Op.Update, 'Pending City');
       });
       expect(state.inspect.locations[0].name.pending()).toBe(true);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.locations = [{ name: faker.location.city() }, { name: faker.location.city() }];
       });
 
@@ -146,14 +149,15 @@ describe('State', () => {
      * Verifies that annotations persist when objects are spread, preserving identity.
      */
     it('replaces locations (annotations persist with spread)', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.locations[0].name = state.annotate(Op.Update, 'Pending City');
       });
       expect(state.inspect.locations[0].name.pending()).toBe(true);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.locations = [{ ...draft.locations[0] }, { name: faker.location.city() }];
       });
 
@@ -165,10 +169,11 @@ describe('State', () => {
      * and splice() physically removes items from the array.
      */
     it('removes locations', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
       {
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.locations[1] = state.annotate(Op.Remove, { ...draft.locations[1] });
         });
         expect(state.model.locations.length).toBe(3);
@@ -176,7 +181,7 @@ describe('State', () => {
       }
 
       {
-        state.mutate((draft) => {
+        state.produce((draft) => {
           draft.locations.splice(0, 1);
         });
         expect(state.model.locations.length).toBe(2);
@@ -187,9 +192,10 @@ describe('State', () => {
      * Verifies that combined operation bitmasks work correctly with is().
      */
     it('supports combined operations bitmask', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.name.first = state.annotate(Op.Update | Op.Replace, 'Combined');
       });
 
@@ -198,6 +204,52 @@ describe('State', () => {
       expect(state.inspect.name.first.is(Op.Replace)).toBe(true);
       expect(state.inspect.name.first.is(Op.Add)).toBe(false);
       expect(state.inspect.name.first.is(Op.Remove)).toBe(false);
+    });
+
+    /**
+     * Verifies that hydrate() sets model values while tracking annotations.
+     */
+    it('supports hydrate() for setting initial annotated values', () => {
+      const first = faker.person.firstName();
+      const city = faker.location.city();
+
+      const state = new State<Model>();
+      const process = state.hydrate({
+        name: state.annotate(Op.Add, {
+          first: state.annotate(Op.Update, first),
+          last: model.name.last,
+        }),
+        age: model.age,
+        locations: [...model.locations, state.annotate(Op.Add, { name: city })],
+      });
+
+      // Model should have the annotated values
+      expect(state.model.name.first).toBe(first);
+      expect(state.model.name.last).toBe(model.name.last);
+      expect(state.model.age).toBe(model.age);
+      expect(state.model.locations.length).toBe(4);
+      expect(state.model.locations[3].name).toBe(city);
+
+      // Annotations should be tracked in the registry
+      expect(state.inspect.name.pending()).toBe(true);
+      expect(state.inspect.name.is(Op.Add)).toBe(true);
+      expect(state.inspect.name.first.pending()).toBe(true);
+      expect(state.inspect.name.first.is(Op.Update)).toBe(true);
+      expect(state.inspect.name.first.draft()).toBe(first);
+      expect(state.inspect.name.last.pending()).toBe(false);
+      expect(state.inspect.age.pending()).toBe(false);
+      expect(state.inspect.locations[3].pending()).toBe(true);
+      expect(state.inspect.locations[3].is(Op.Add)).toBe(true);
+
+      // Pruning clears pending state
+      state.prune(process);
+      expect(state.inspect.name.pending()).toBe(false);
+      expect(state.inspect.name.first.pending()).toBe(false);
+      expect(state.inspect.locations[3].pending()).toBe(false);
+
+      // Model values remain unchanged after prune
+      expect(state.model.name.first).toBe(first);
+      expect(state.model.locations[3].name).toBe(city);
     });
   });
 
@@ -209,9 +261,10 @@ describe('State', () => {
      * Verifies that prune() removes all annotations associated with a process symbol.
      */
     it('removes annotations by process', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      const process = state.mutate((draft) => {
+      const process = state.produce((draft) => {
         draft.name.first = state.annotate(Op.Update, 'Pending');
       });
       expect(state.inspect.name.first.pending()).toBe(true);
@@ -231,10 +284,11 @@ describe('State', () => {
      * Verifies that settled() resolves with the model value once annotations are pruned.
      */
     it('resolves when there are no more annotations', async () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       const value = faker.person.firstName();
 
-      const process = state.mutate((draft) => {
+      const process = state.produce((draft) => {
         draft.name.first = state.annotate(Op.Update, value);
       });
 
@@ -242,7 +296,7 @@ describe('State', () => {
       expect(state.inspect.name.first.pending()).toBe(true);
       expect(state.model.name.first).toBe(model.name.first);
 
-      state.mutate((draft) => void (draft.name.first = value));
+      state.produce((draft) => void (draft.name.first = value));
       state.prune(process);
 
       expect(await name).toBe(value);
@@ -252,7 +306,8 @@ describe('State', () => {
      * Verifies that settled() resolves immediately if no annotations exist.
      */
     it('resolves immediately when no annotations', async () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       expect(await state.inspect.name.first.settled()).toBe(model.name.first);
     });
 
@@ -260,11 +315,12 @@ describe('State', () => {
      * Verifies that settled() waits for all annotations to be pruned.
      */
     it('waits for all annotations to be pruned', async () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       const value = faker.person.firstName();
 
-      const process1 = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
-      const process2 = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
+      const process1 = state.produce((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
+      const process2 = state.produce((draft) => void (draft.name.first = state.annotate(Op.Update, value)));
 
       const name = state.inspect.name.first.settled();
       expect(state.inspect.name.first.pending()).toBe(true);
@@ -274,7 +330,7 @@ describe('State', () => {
       expect(state.inspect.name.first.pending()).toBe(true);
       expect(state.inspect.name.first.remaining()).toBe(1);
 
-      state.mutate((draft) => void (draft.name.first = value));
+      state.produce((draft) => void (draft.name.first = value));
       state.prune(process2);
 
       expect(state.inspect.name.first.remaining()).toBe(0);
@@ -290,13 +346,14 @@ describe('State', () => {
      * Verifies that observe() calls the callback on mutate().
      */
     it('calls callback on mutate', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       const callback = vi.fn();
 
       state.observe(callback);
       expect(callback).not.toHaveBeenCalled();
 
-      state.mutate((draft) => void (draft.age = 99));
+      state.produce((draft) => void (draft.age = 99));
       expect(callback).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledWith(state.model);
     });
@@ -305,12 +362,13 @@ describe('State', () => {
      * Verifies that observe() calls the callback on prune().
      */
     it('calls callback on prune', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       const callback = vi.fn();
 
       state.observe(callback);
 
-      const process = state.mutate((draft) => void (draft.name.first = state.annotate(Op.Update, 'Pending')));
+      const process = state.produce((draft) => void (draft.name.first = state.annotate(Op.Update, 'Pending')));
       expect(callback).toHaveBeenCalledTimes(1);
 
       state.prune(process);
@@ -321,15 +379,16 @@ describe('State', () => {
      * Verifies that the unsubscribe function stops callbacks.
      */
     it('unsubscribes when returned function is called', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
       const callback = vi.fn();
 
       const unsubscribe = state.observe(callback);
-      state.mutate((draft) => void (draft.age = 50));
+      state.produce((draft) => void (draft.age = 50));
       expect(callback).toHaveBeenCalledTimes(1);
 
       unsubscribe();
-      state.mutate((draft) => void (draft.age = 60));
+      state.produce((draft) => void (draft.age = 60));
       expect(callback).toHaveBeenCalledTimes(1);
     });
   });
@@ -351,9 +410,10 @@ describe('State', () => {
      * Verifies that δ is an alias for annotate.
      */
     it('δ annotates values like annotate', () => {
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      state.mutate((draft) => {
+      state.produce((draft) => {
         draft.name.first = state.δ(Op.Update, 'Pending');
       });
 
@@ -367,9 +427,10 @@ describe('State', () => {
     it('annotates primitive value on root model', () => {
       type Model = { count: number };
       const model: Model = { count: 1 };
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
-      const process = state.mutate((draft) => {
+      const process = state.produce((draft) => {
         const newValue = draft.count + 1;
         draft.count = state.annotate(Op.Update, newValue);
       });
@@ -378,7 +439,7 @@ describe('State', () => {
       expect(state.inspect.count.pending()).toBe(true);
       expect(state.inspect.count.draft()).toBe(2);
 
-      state.mutate((draft) => void (draft.count = 2));
+      state.produce((draft) => void (draft.count = 2));
       state.prune(process);
 
       expect(state.inspect.count.pending()).toBe(false);
@@ -393,14 +454,15 @@ describe('State', () => {
     it('accumulates concurrent annotations correctly', () => {
       type Model = { count: number };
       const model: Model = { count: 1 };
-      const state = new State<Model>(model);
+      const state = new State<Model>();
+      state.hydrate(model);
 
       // Simulate rapid clicks - each reads draft() and increments by 1
       const processes: symbol[] = [];
 
       // Click 1: draft() = 1 (no annotations), annotate with 2
       processes.push(
-        state.mutate((draft) => {
+        state.produce((draft) => {
           const current = state.inspect.count.draft() ?? draft.count;
           draft.count = state.annotate(Op.Update, current + 1);
         }),
@@ -411,7 +473,7 @@ describe('State', () => {
 
       // Click 2: draft() = 2 (from first annotation), annotate with 3
       processes.push(
-        state.mutate((draft) => {
+        state.produce((draft) => {
           const current = state.inspect.count.draft() ?? draft.count;
           draft.count = state.annotate(Op.Update, current + 1);
         }),
@@ -422,7 +484,7 @@ describe('State', () => {
 
       // Click 3: draft() = 3 (from second annotation), annotate with 4
       processes.push(
-        state.mutate((draft) => {
+        state.produce((draft) => {
           const current = state.inspect.count.draft() ?? draft.count;
           draft.count = state.annotate(Op.Update, current + 1);
         }),
@@ -433,7 +495,7 @@ describe('State', () => {
 
       // Click 4: draft() = 4 (from third annotation), annotate with 5
       processes.push(
-        state.mutate((draft) => {
+        state.produce((draft) => {
           const current = state.inspect.count.draft() ?? draft.count;
           draft.count = state.annotate(Op.Update, current + 1);
         }),

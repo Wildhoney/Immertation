@@ -5,6 +5,7 @@ import {
   type Identity,
   type Inspect,
   type Model,
+  Mode,
   type Operation,
   type Path,
   type Process,
@@ -15,7 +16,7 @@ import {
   type Tagged,
 } from './types';
 
-export { Config, type Tagged } from './types';
+export { Config, Mode, type Tagged } from './types';
 import { A, G } from '@mobily/ts-belt';
 import get from 'lodash/get';
 
@@ -156,6 +157,7 @@ export function inspect<M extends Model>(
 
 /**
  * Reconciles patch values by unwrapping annotations and registering them.
+ * @param {Mode} mode - Mode.Produce preserves originals, Mode.Hydrate uses annotation values
  * @param {Patch} patch - The Immer patch to reconcile
  * @param {M} snapshot - Current model snapshot
  * @param {Process} process - The process symbol
@@ -164,6 +166,7 @@ export function inspect<M extends Model>(
  * @returns {M} The reconciled value
  */
 export function reconcile<M extends Model>(
+  mode: Mode,
   patch: Patch,
   snapshot: M,
   process: Process,
@@ -172,24 +175,34 @@ export function reconcile<M extends Model>(
 ): M {
   function discover(model: M, path: Path = patch.path): M {
     if (model instanceof Annotation) {
-      const value = <M | undefined>get(snapshot, path.join('.'));
+      const present = <M | undefined>get(snapshot, path.join('.'));
 
       Object.entries(model)
         .filter(([key, value]) => !Annotation.keys.has(key) && value instanceof Annotation)
         .forEach(([key, value]) => discover(<M>value, path.concat(key)));
 
       if (primitive(model.value)) {
+        if (mode === Mode.Hydrate) {
+          return <M>(<unknown>model.value);
+        }
         const parentPath = path.slice(0, -1);
         const context = parentPath.length > 0 ? get(snapshot, parentPath.join('.')) : snapshot;
         if (!G.isNullable(context)) {
           register(context, model, path.at(-1), process, registry, identity);
         }
-        return value ?? <M>(<unknown>model.value);
+        return present ?? <M>(<unknown>model.value);
       }
 
-      const target = value ?? tag(model.value);
+      if (mode === Mode.Hydrate) {
+        const processed = discover(<M>model.value, path);
+        const target = tag(processed);
+        register(target, model, null, process, registry, identity);
+        return <M>target;
+      }
+
+      const target = present ?? tag(model.value);
       register(target, model, null, process, registry, identity);
-      return G.isNullable(value) ? <M>target : (discover(model.value, path), <M>value);
+      return G.isNullable(present) ? <M>target : (discover(model.value, path), <M>present);
     }
 
     if (G.isArray(model)) {
@@ -197,9 +210,20 @@ export function reconcile<M extends Model>(
     }
 
     if (G.isObject(model)) {
-      return <M>(
-        Object.fromEntries(Object.entries(model).map(([key, value]) => [key, discover(value, path.concat(key))]))
-      );
+      const entries = Object.entries(model).map(([key, value]) => [key, discover(value, path.concat(key))]);
+      const result = <M>Object.fromEntries(entries);
+
+      if (mode === Mode.Hydrate) {
+        const tagged = tag(result);
+        Object.entries(model).forEach(([key, originalValue]) => {
+          if (originalValue instanceof Annotation && primitive(originalValue.value)) {
+            register(tagged, <Annotation<M>>(<unknown>originalValue), key, process, registry, identity);
+          }
+        });
+        return <M>tagged;
+      }
+
+      return result;
     }
 
     return model;

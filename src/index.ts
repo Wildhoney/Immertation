@@ -4,6 +4,7 @@ import {
   type Identity,
   type Inspect,
   type Model,
+  Mode,
   type Operation,
   type Process,
   type Recipe,
@@ -19,7 +20,7 @@ import { A } from '@mobily/ts-belt';
  */
 export class State<M extends Model> {
   /** The current model state */
-  #model: M;
+  #model: M = <M>{};
   /** Function to generate unique IDs from snapshots */
   #identity: Identity<M>;
   /** Map of IDs to their annotations */
@@ -29,11 +30,9 @@ export class State<M extends Model> {
 
   /**
    * Creates a new State instance.
-   * @param {M} model - The initial model state
    * @param {Identity<M>} [identity] - Optional function to generate unique IDs for snapshots
    */
-  constructor(model: M, identity: Identity<M> = utils.identity) {
-    this.#model = utils.tag(model);
+  constructor(identity: Identity<M> = utils.identity) {
     this.#identity = identity;
   }
 
@@ -85,11 +84,31 @@ export class State<M extends Model> {
   }
 
   /**
+   * Hydrates the state with a model, extracting annotations and registering them.
+   * Unlike produce(), annotation values become the actual model values.
+   * @param {M} model - The model to hydrate with (may contain annotations)
+   * @returns {Process} A unique process symbol for tracking this mutation batch
+   */
+  hydrate(model: M): Process {
+    return this.#apply(Mode.Hydrate, (draft) => Object.assign(draft, model));
+  }
+
+  /**
    * Applies mutations to the model using an Immer recipe.
    * @param {Recipe<M>} recipe - Function that mutates the draft
    * @returns {Process} A unique process symbol for tracking this mutation batch
    */
-  mutate(recipe: Recipe<M>): Process {
+  produce(recipe: Recipe<M>): Process {
+    return this.#apply(Mode.Produce, recipe);
+  }
+
+  /**
+   * Internal method that applies a recipe and reconciles annotations.
+   * @param {Mode} mode - Mode.Produce preserves originals, Mode.Hydrate uses annotation values
+   * @param {Recipe<M>} recipe - Function that mutates the draft
+   * @returns {Process} A unique process symbol for tracking this mutation batch
+   */
+  #apply(mode: Mode, recipe: Recipe<M>): Process {
     const process = Symbol('process');
 
     const [, patches] = utils.Config.immer.produceWithPatches(this.#model, recipe);
@@ -97,7 +116,7 @@ export class State<M extends Model> {
     this.#model = patches.reduce(
       (model, patch) =>
         utils.Config.immer.applyPatches(model, [
-          { ...patch, value: utils.reconcile(patch, model, process, this.#registry, this.#identity) },
+          { ...patch, value: utils.reconcile(mode, patch, model, process, this.#registry, this.#identity) },
         ]),
       this.#model,
     );
