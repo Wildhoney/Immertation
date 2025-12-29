@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.22](https://github.com/Wildhoney/Immertation/compare/v0.1.21...v0.1.22) (2025-12-29)
+
+
+### Features
+
+* ensuring that hydrate() is called before produce() ([594721b](https://github.com/Wildhoney/Immertation/commit/594721b177a014d513b250d6753f6af812699e27))
+
 ## [0.1.21](https://github.com/Wildhoney/Immertation/compare/v0.1.19...v0.1.21) (2025-12-29)
 
 ## [0.1.19](https://github.com/Wildhoney/Immertation/compare/v0.1.18...v0.1.19) (2025-12-19)
