@@ -27,6 +27,8 @@ export class State<M extends Model> {
   #registry: Registry<M> = new Map();
   /** Subscribers waiting for registry changes */
   #subscribers: Set<Subscriber> = new Set();
+  /** Whether hydrate() has been called */
+  #hydrated = false;
 
   /**
    * Creates a new State instance.
@@ -90,6 +92,7 @@ export class State<M extends Model> {
    * @returns {Process} A unique process symbol for tracking this mutation batch
    */
   hydrate(model: M): Process {
+    this.#hydrated = true;
     return this.#apply(Mode.Hydrate, (draft) => Object.assign(draft, model));
   }
 
@@ -99,6 +102,9 @@ export class State<M extends Model> {
    * @returns {Process} A unique process symbol for tracking this mutation batch
    */
   produce(recipe: Recipe<M>): Process {
+    if (!this.#hydrated) {
+      throw new Error('State must be hydrated using hydrate() before calling produce()');
+    }
     return this.#apply(Mode.Produce, recipe);
   }
 

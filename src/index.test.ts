@@ -394,6 +394,24 @@ describe('State', () => {
   });
 
   /**
+   * Tests for behavior when produce() is called without hydrate().
+   */
+  describe('produce() without hydrate()', () => {
+    /**
+     * Verifies that produce() throws a helpful error when hydrate() hasn't been called.
+     */
+    it('throws descriptive error when produce() called before hydrate()', () => {
+      const state = new State<Model>();
+
+      expect(() => {
+        state.produce((draft) => {
+          draft.name.first = 'Adam';
+        });
+      }).toThrow('State must be hydrated using hydrate() before calling produce()');
+    });
+  });
+
+  /**
    * Tests for Greek letter shorthand aliases.
    */
   describe('aliases', () => {
