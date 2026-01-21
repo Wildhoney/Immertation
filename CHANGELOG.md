@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.23](https://github.com/Wildhoney/Immertation/compare/v0.1.22...v0.1.23) (2026-01-21)
+
+
+### Features
+
+* improved minification ([f713d95](https://github.com/Wildhoney/Immertation/commit/f713d957b30b00aaaa3d369d52104e625aaaf630))
+
 ## [0.1.22](https://github.com/Wildhoney/Immertation/compare/v0.1.21...v0.1.22) (2025-12-29)
 
 
