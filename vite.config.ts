@@ -48,6 +48,18 @@ export default defineConfig({
   },
   build: {
     emptyOutDir: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        passes: 2,
+      },
+      format: {
+        comments: false,
+      },
+      mangle: true,
+    },
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'Immertation',
@@ -57,15 +69,11 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'immer',
-        'lodash/cloneDeep',
-        'lodash/get',
         '@mobily/ts-belt',
       ],
       output: {
         globals: {
           immer: 'immer',
-          'lodash/cloneDeep': '_.cloneDeep',
-          'lodash/get': '_.get',
           '@mobily/ts-belt': 'TsBelt',
         },
       },

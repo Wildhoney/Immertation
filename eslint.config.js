@@ -25,6 +25,13 @@ export default [
           varsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        {
+          assertionStyle: 'angle-bracket',
+          objectLiteralTypeAssertions: 'allow',
+        },
+      ],
     },
   },
 ];

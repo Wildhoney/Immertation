@@ -1,7 +1,101 @@
 import { faker } from '@faker-js/faker';
 import { describe, expect, it } from 'vitest';
-import { primitive } from './utils';
+import { get, primitive } from './utils';
 import { Op, State } from '.';
+
+describe('get()', () => {
+  const input = {
+    a: 1,
+    b: { c: 2, d: { e: 3 } },
+    arr: [{ x: 10 }, { x: 20 }, { x: 30 }],
+    'dot.key': 'dotted',
+    0: 'zero',
+  };
+
+  describe('string path', () => {
+    it('accesses top-level properties', () => {
+      expect(get(input, 'a')).toBe(1);
+    });
+
+    it('accesses nested properties with dot notation', () => {
+      expect(get(input, 'b.c')).toBe(2);
+      expect(get(input, 'b.d.e')).toBe(3);
+    });
+
+    it('accesses array elements by index', () => {
+      expect(get(input, 'arr.0')).toEqual({ x: 10 });
+      expect(get(input, 'arr.1.x')).toBe(20);
+      expect(get(input, 'arr.2.x')).toBe(30);
+    });
+
+    it('returns undefined for non-existent paths', () => {
+      expect(get(input, 'nonexistent')).toBeUndefined();
+      expect(get(input, 'b.nonexistent')).toBeUndefined();
+      expect(get(input, 'b.d.e.f')).toBeUndefined();
+    });
+
+    it('returns undefined when traversing through null/undefined', () => {
+      expect(get({ a: null }, 'a.b')).toBeUndefined();
+      expect(get({ a: undefined }, 'a.b')).toBeUndefined();
+    });
+
+    it('handles empty string path', () => {
+      expect(get(input, '')).toEqual(input);
+    });
+  });
+
+  describe('array path', () => {
+    it('accesses properties with array path', () => {
+      expect(get(input, ['a'])).toBe(1);
+      expect(get(input, ['b', 'c'])).toBe(2);
+      expect(get(input, ['b', 'd', 'e'])).toBe(3);
+    });
+
+    it('accesses array elements with numeric keys', () => {
+      expect(get(input, ['arr', 0])).toEqual({ x: 10 });
+      expect(get(input, ['arr', 1, 'x'])).toBe(20);
+    });
+
+    it('handles mixed string and number keys', () => {
+      expect(get(input, ['arr', 0, 'x'])).toBe(10);
+    });
+
+    it('returns undefined for non-existent array paths', () => {
+      expect(get(input, ['nonexistent'])).toBeUndefined();
+      expect(get(input, ['arr', 99])).toBeUndefined();
+    });
+
+    it('handles empty array path', () => {
+      expect(get(input, [])).toEqual(input);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles null input', () => {
+      expect(get(null, 'a')).toBeUndefined();
+      expect(get(null, ['a'])).toBeUndefined();
+    });
+
+    it('handles undefined input', () => {
+      expect(get(undefined, 'a')).toBeUndefined();
+      expect(get(undefined, ['a'])).toBeUndefined();
+    });
+
+    it('accesses numeric string keys', () => {
+      expect(get(input, '0')).toBe('zero');
+      expect(get(input, ['0'])).toBe('zero');
+    });
+
+    it('returns primitive values directly', () => {
+      expect(get('hello', '0')).toBe('h');
+      expect(get('hello', 'length')).toBe(5);
+    });
+
+    it('accesses array length', () => {
+      expect(get(input, 'arr.length')).toBe(3);
+    });
+  });
+});
 
 describe('primitive()', () => {
   it.each([

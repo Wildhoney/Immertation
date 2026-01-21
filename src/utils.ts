@@ -18,7 +18,22 @@ import {
 
 export { Config, Mode, type Tagged } from './types';
 import { A, G } from '@mobily/ts-belt';
-import get from 'lodash/get';
+
+/**
+ * Simple deep property access (replaces lodash/get).
+ * @param input - The object to query
+ * @param path - The path as dot-notation string (e.g., 'a.b.c') or array of keys
+ * @returns The value at path, or undefined if not found or path is invalid
+ */
+export function get(input: unknown, path: string | (string | number)[]): unknown {
+  const keys = typeof path === 'string' ? (path === '' ? [] : path.split('.')) : path;
+  let result: unknown = input;
+  for (const key of keys) {
+    if (result == null) return undefined;
+    result = (<Record<string | number, unknown>>result)[key];
+  }
+  return result;
+}
 
 /**
  * Recursively tags all objects in a model with unique IDs for identity tracking.
@@ -115,11 +130,11 @@ export function inspect<M extends Model>(
 
     const object =
       G.isObject(target) || G.isArray(target)
-        ? (registry.get(identity(target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
+        ? (registry.get(identity(<Snapshot<M>>target))?.filter((annotation) => G.isNullable(annotation.property)) ?? [])
         : [];
 
     const property = G.isObject(parent)
-      ? (registry.get(identity(parent))?.filter((annotation) => annotation.property === key) ?? [])
+      ? (registry.get(identity(<Snapshot<M>>parent))?.filter((annotation) => annotation.property === key) ?? [])
       : [];
 
     return [...object, ...property];

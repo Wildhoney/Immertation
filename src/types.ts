@@ -145,7 +145,7 @@ export class Config {
   })();
 
   /** String key for tagging objects */
-  static tag = 'κ' as const;
+  static tag = <const>'κ';
 
   /** Generates a unique ID for tagging objects */
   static id = nanoid;

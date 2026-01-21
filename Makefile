@@ -1,4 +1,4 @@
-.PHONY: fmt lint typecheck unit build checks start dev deploy integration
+.PHONY: fmt lint typecheck unit build size checks start dev deploy integration
 
 fmt:
 	pnpm run fmt
@@ -18,13 +18,16 @@ integration:
 build:
 	pnpm run build
 
+size:
+	pnpm run size
+
 start:
 	pnpm run dev
 
 dev:
 	pnpm run dev
 
-checks: fmt lint typecheck unit integration
+checks: fmt lint typecheck unit build size integration
 
 deploy:
 	pnpm install
