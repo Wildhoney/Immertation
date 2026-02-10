@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.24](https://github.com/Wildhoney/Immertation/compare/v0.1.23...v0.1.24) (2026-02-10)
+
+
+### Features
+
+* allow hydrate() to return replacement model for top-level primitive annotations ([25ecbcd](https://github.com/Wildhoney/Immertation/commit/25ecbcdd1cf0731c3530fe605eea6bc6fb071d89))
+
 ## [0.1.23](https://github.com/Wildhoney/Immertation/compare/v0.1.22...v0.1.23) (2026-01-21)
 
 
