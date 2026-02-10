@@ -37,6 +37,22 @@ export enum Operation {
   Move = 8,
   Replace = 16,
   Sort = 32,
+  Create = 64,
+  Fetch = 128,
+  Clone = 256,
+  Archive = 512,
+  Restore = 1_024,
+  Merge = 2_048,
+  Reorder = 4_096,
+  Sync = 8_192,
+  Publish = 16_384,
+  Link = 32_768,
+  Unlink = 65_536,
+  Lock = 131_072,
+  Unlock = 262_144,
+  Import = 524_288,
+  Export = 1_048_576,
+  Transfer = 2_097_152,
 }
 
 /** Mode for reconcile function */

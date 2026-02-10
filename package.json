@@ -23,7 +23,7 @@
     "build:example": "vite build --config vite.config.example.ts",
     "preview": "vite preview",
     "unit": "vitest run src",
-    "integration": "playwright test",
+    "integration": "playwright install chromium && playwright test",
     "lint": "eslint 'src/**/*.{ts,tsx}' --fix",
     "size": "fslint --files 'dist/immertation.mjs' --limit-kb 5",
     "fmt": "prettier --write 'src/**/*.{ts,tsx,json}'",
