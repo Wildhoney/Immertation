@@ -93,7 +93,7 @@ export class State<M extends Model> {
    */
   hydrate(model: M): Process {
     this.#hydrated = true;
-    return this.#apply(Mode.Hydrate, (draft) => Object.assign(draft, model));
+    return this.#apply(Mode.Hydrate, () => model);
   }
 
   /**

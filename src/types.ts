@@ -23,8 +23,8 @@ export type Snapshot<T, D extends number = 5> = [D] extends [0]
 /** Function that generates unique IDs from model snapshots */
 export type Identity<M extends Model> = (snapshot: Snapshot<M>) => Id;
 
-/** Immer recipe function for mutating the draft */
-export type Recipe<M extends Model> = (draft: M) => void;
+/** Immer recipe function for mutating the draft or returning a replacement */
+export type Recipe<M extends Model> = (draft: M) => void | M;
 
 /** Unique symbol identifying a mutation batch */
 export type Process = symbol;

@@ -251,6 +251,36 @@ describe('State', () => {
       expect(state.model.name.first).toBe(first);
       expect(state.model.locations[3].name).toBe(city);
     });
+
+    it('supports hydrate() for top-level primitive annotations', () => {
+      type SimpleModel = { name: string | null; count: number };
+      const state = new State<SimpleModel>();
+
+      const process = state.hydrate({
+        name: state.annotate(Op.Update, null),
+        count: state.annotate(Op.Add, 0),
+      });
+
+      // Model should have the unwrapped primitive values
+      expect(state.model.name).toBeNull();
+      expect(state.model.count).toBe(0);
+
+      // Annotations should be tracked in the registry
+      expect(state.inspect.name.pending()).toBe(true);
+      expect(state.inspect.name.is(Op.Update)).toBe(true);
+      expect(state.inspect.count.pending()).toBe(true);
+      expect(state.inspect.count.is(Op.Add)).toBe(true);
+      expect(state.inspect.count.draft()).toBe(0);
+
+      // Pruning clears pending state
+      state.prune(process);
+      expect(state.inspect.name.pending()).toBe(false);
+      expect(state.inspect.count.pending()).toBe(false);
+
+      // Model values remain unchanged after prune
+      expect(state.model.name).toBeNull();
+      expect(state.model.count).toBe(0);
+    });
   });
 
   /**
