@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.26](https://github.com/Wildhoney/Immertation/compare/v0.1.25...v0.1.26) (2026-02-11)
+
+
+### Bug Fixes
+
+* preserve native object prototypes (File, Date) through produce cycle ([3c03f17](https://github.com/Wildhoney/Immertation/commit/3c03f170611749118e503723f1ba927e2afe4fca))
+
 ## [0.1.25](https://github.com/Wildhoney/Immertation/compare/v0.1.24...v0.1.25) (2026-02-10)
 
 
