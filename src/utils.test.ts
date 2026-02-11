@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { describe, expect, it } from 'vitest';
-import { get, primitive } from './utils';
+import { get, plain, primitive, tag } from './utils';
 import { Op, State } from '.';
 
 describe('get()', () => {
@@ -111,6 +111,51 @@ describe('primitive()', () => {
     ['function', () => {}, false],
   ])('primitive(%s) returns %s', (_, value, expected) => {
     expect(primitive(value)).toBe(expected);
+  });
+});
+
+describe('plain()', () => {
+  it.each([
+    ['plain object', {}, true],
+    ['Object.create(null)', Object.create(null), true],
+    ['File', new File([''], 'test.png', { type: 'image/png' }), false],
+    ['Date', new Date(), false],
+    ['RegExp', /test/, false],
+    ['Map', new Map(), false],
+    ['Set', new Set(), false],
+  ])('plain(%s) returns %s', (_, value, expected) => {
+    expect(plain(value)).toBe(expected);
+  });
+});
+
+describe('tag()', () => {
+  it('preserves File objects in state', () => {
+    const file = new File(['content'], 'receipt.png', { type: 'image/png' });
+    const model = { files: [file], name: 'test' };
+    const tagged = tag(model);
+
+    expect(tagged.files[0]).toBe(file);
+    expect(tagged.files[0].name).toBe('receipt.png');
+    expect(tagged.files[0].type).toBe('image/png');
+  });
+
+  it('preserves Date objects in state', () => {
+    const date = new Date('2025-01-01');
+    const model = { createdAt: date };
+    const tagged = tag(model);
+
+    expect(tagged.createdAt).toBe(date);
+    expect(tagged.createdAt.toISOString()).toBe(date.toISOString());
+  });
+
+  it('still tags plain objects', () => {
+    const model = { name: 'test', nested: { value: 1 } };
+    const tagged = tag(model);
+
+    expect(tagged).toHaveProperty('κ');
+    expect(tagged.nested).toHaveProperty('κ');
+    expect(tagged.name).toBe('test');
+    expect(tagged.nested.value).toBe(1);
   });
 });
 

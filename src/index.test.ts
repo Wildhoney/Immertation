@@ -495,6 +495,65 @@ describe('State', () => {
     });
 
     /**
+     * Verifies that native objects like File and Date preserve their prototypes
+     * when passed through produce(). These objects should not be spread into
+     * plain objects by the reconcile step.
+     */
+    it('preserves File objects through produce()', () => {
+      type Model = { files: File[] };
+      const model: Model = { files: [] };
+      const state = new State<Model>();
+      state.hydrate(model);
+
+      const file = new File(['content'], 'receipt.png', { type: 'image/png' });
+      state.produce((draft) => {
+        draft.files = [file];
+      });
+
+      expect(state.model.files[0]).toBeInstanceOf(File);
+      expect(state.model.files[0].name).toBe('receipt.png');
+      expect(state.model.files[0].type).toBe('image/png');
+    });
+
+    it('preserves File objects when appending to existing array', () => {
+      type Model = { files: File[] };
+      const first = new File(['a'], 'first.png', { type: 'image/png' });
+      const model: Model = { files: [] };
+      const state = new State<Model>();
+      state.hydrate(model);
+
+      state.produce((draft) => {
+        draft.files = [first];
+      });
+
+      const second = new File(['b'], 'second.pdf', { type: 'application/pdf' });
+      state.produce((draft) => {
+        draft.files = [...draft.files, second];
+      });
+
+      expect(state.model.files).toHaveLength(2);
+      expect(state.model.files[0]).toBeInstanceOf(File);
+      expect(state.model.files[0].name).toBe('first.png');
+      expect(state.model.files[1]).toBeInstanceOf(File);
+      expect(state.model.files[1].name).toBe('second.pdf');
+    });
+
+    it('preserves Date objects through produce()', () => {
+      type Model = { createdAt: Date | null };
+      const model: Model = { createdAt: null };
+      const state = new State<Model>();
+      state.hydrate(model);
+
+      const date = new Date('2025-06-15');
+      state.produce((draft) => {
+        draft.createdAt = date;
+      });
+
+      expect(state.model.createdAt).toBeInstanceOf(Date);
+      expect(state.model.createdAt?.toISOString()).toBe(date.toISOString());
+    });
+
+    /**
      * Verifies that rapid concurrent annotations accumulate correctly.
      * Each mutation should see the most recent draft value, not stale data.
      * This simulates rapidly clicking a + button multiple times.

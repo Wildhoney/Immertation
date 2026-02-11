@@ -50,7 +50,7 @@ export function tag<T>(model: T): T {
     return <T>model.map((item) => tag(item));
   }
 
-  if (G.isObject(model)) {
+  if (G.isObject(model) && plain(model)) {
     const entries = Object.entries(model).map(([key, value]) => [key, tag(value)]);
     return <T>{
       ...Object.fromEntries(entries),
@@ -83,6 +83,17 @@ export function identity<M extends Model>(snapshot: Snapshot<M>): string {
   } catch {
     return `[unserializable:${typeof snapshot}]`;
   }
+}
+
+/**
+ * Checks if a value is a plain object (created via `{}` or `Object.create(null)`).
+ * Returns false for class instances like File, Date, RegExp, Map, Set, etc.
+ * @param {unknown} value - Value to check
+ * @returns {boolean} True if plain object
+ */
+export function plain(value: unknown): boolean {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /**
@@ -222,6 +233,10 @@ export function reconcile<M extends Model>(
 
     if (G.isArray(model)) {
       return <M>model.map((item, index) => discover(item, path.concat(index)));
+    }
+
+    if (G.isObject(model) && !plain(model)) {
+      return model;
     }
 
     if (G.isObject(model)) {
