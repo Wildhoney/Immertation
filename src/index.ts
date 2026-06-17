@@ -163,4 +163,5 @@ export class State<M extends Model> {
 }
 
 export { Operation, Operation as Op } from './types';
+export { isBox } from './utils';
 export type { Box, Id, Identity, Inspect, Snapshot, Process } from './types';

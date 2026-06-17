@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { describe, expect, it } from 'vitest';
-import { get, plain, primitive, tag } from './utils';
+import { get, isBox, plain, primitive, tag } from './utils';
 import { Op, State } from '.';
 
 describe('get()', () => {
@@ -379,5 +379,37 @@ describe('box()', () => {
       expect(box.value.name).toBe(model.locations[0].name);
       expect(box.inspect.name.pending()).toBe(false);
     });
+  });
+});
+
+describe('isBox()', () => {
+  it('returns true for the result of an inspect.box() call', () => {
+    const state = new State<{ name: string }>();
+    state.hydrate({ name: faker.person.firstName() });
+
+    const box = state.inspect.name.box();
+    expect(isBox(box)).toBe(true);
+  });
+
+  it.each([
+    ['plain string', faker.lorem.word()],
+    ['number', faker.number.int()],
+    ['boolean', true],
+    ['null', null],
+    ['undefined', undefined],
+    ['array', [1, 2, 3]],
+    ['plain object without value/inspect', { foo: 'bar' }],
+    ['object with only value', { value: 1 }],
+    ['object with only inspect', { inspect: {} }],
+  ])('returns false for %s', (_, value) => {
+    expect(isBox(value)).toBe(false);
+  });
+
+  it('narrows the type when used as a guard', () => {
+    const value: unknown = { value: 'foo', inspect: {} };
+    if (isBox<string>(value)) {
+      // Type-only check: value.value should now be string-typed
+      expect(value.value).toBe('foo');
+    }
   });
 });

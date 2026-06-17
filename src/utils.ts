@@ -1,6 +1,7 @@
 import type { Patch } from 'immer';
 import {
   Annotation,
+  type Box,
   Config,
   type Identity,
   type Inspect,
@@ -110,6 +111,17 @@ export function primitive(value: unknown): value is string | number | boolean | 
     typeof value === 'symbol' ||
     typeof value === 'bigint'
   );
+}
+
+/**
+ * Type guard that checks whether a value matches the {@link Box} shape — a
+ * `{ value, inspect }` pair returned by an inspect proxy's `box()` method.
+ * @template T - The boxed value type
+ * @param {unknown} value - Value to check
+ * @returns {boolean} True if the value is a Box
+ */
+export function isBox<T = unknown>(value: unknown): value is Box<T> {
+  return G.isObject(value) && 'value' in value && 'inspect' in value;
 }
 
 /**
