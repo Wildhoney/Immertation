@@ -88,22 +88,17 @@ type Inspectors<T = unknown> = {
   box(): Box<T>;
 };
 
-/**
- * Recursive proxy type for inspecting annotations at any path in the model.
- * Combines inspector methods with recursive property access.
- * Recursion is bounded by {@link DepthLimiter} so deeply nested model shapes
- * don't blow TypeScript's instantiation depth limit (which typescript-eslint
- * surfaces as `error`/`any` on every reachable navigation site).
- * The depth check wraps the mapped type so typescript-eslint's resolver can
- * short-circuit at depth 0 rather than enumerating keys at every level.
- * @template T - The type of the value being inspected
- * @template D - Remaining recursion depth (defaults to 12)
- */
+type UnionKeys<T> = T extends T ? keyof T : never;
+
+type ValueAt<T, K extends PropertyKey> = T extends Record<K, infer V> ? V : undefined;
+
 export type Inspect<T, D extends number = 12> = Inspectors<T> &
   ([D] extends [0]
     ? object
     : {
-        [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K], DepthLimiter[D]>;
+        [K in UnionKeys<T> as ValueAt<T, K> extends (...args: unknown[]) => unknown
+          ? never
+          : K]: Inspect<ValueAt<T, K>, DepthLimiter[D]>;
       });
 
 /** Internal keys for Annotation class properties */
