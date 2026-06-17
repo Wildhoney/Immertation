@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.29](https://github.com/Wildhoney/Immertation/compare/v0.1.27...v0.1.29) (2026-06-17)
+
+
+### Features
+
+* **types:** brand Box with unique symbol so isBox rejects lookalike user objects ([d8f0da9](https://github.com/Wildhoney/Immertation/commit/d8f0da98889a8b122c78bfcf6729ec35c7bccd72))
+
+
+### Bug Fixes
+
+* **types:** bound Inspect recursion depth to prevent any-degradation on deep paths ([b4759dc](https://github.com/Wildhoney/Immertation/commit/b4759dca7d51e0333e649eddb0d468f77ac77267))
+
 ## [0.1.28](https://github.com/Wildhoney/Immertation/compare/v0.1.27...v0.1.28) (2026-06-17)
 
 
