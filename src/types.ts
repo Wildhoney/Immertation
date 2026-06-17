@@ -101,9 +101,7 @@ export type Inspect<T, D extends number = 12> = Inspectors<T> &
   ([D] extends [0]
     ? object
     : {
-        [K in keyof T as T[K] extends (...args: unknown[]) => unknown
-          ? never
-          : K]: Inspect<T[K], DepthLimiter[D]>;
+        [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K], DepthLimiter[D]>;
       });
 
 /** Internal keys for Annotation class properties */

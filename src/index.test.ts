@@ -654,13 +654,7 @@ describe('State', () => {
 
       expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(false);
 
-      state.produce(
-        (draft) =>
-          void (draft.a.b.c.d.e.f.g.h.i.j.k.l = state.annotate(
-            Op.Update,
-            'pending-leaf',
-          )),
-      );
+      state.produce((draft) => void (draft.a.b.c.d.e.f.g.h.i.j.k.l = state.annotate(Op.Update, 'pending-leaf')));
 
       expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(true);
     });
@@ -687,15 +681,10 @@ describe('State', () => {
       });
 
       expect(typeof state.inspect.next.pending).toBe('function');
-      expect(
-        typeof state.inspect.next.next.next.next.next.next.next.pending,
-      ).toBe('function');
-      expect(
-        typeof state.inspect.next.next.next.next.next.next.next.value.pending,
-      ).toBe('function');
+      expect(typeof state.inspect.next.next.next.next.next.next.next.pending).toBe('function');
+      expect(typeof state.inspect.next.next.next.next.next.next.next.value.pending).toBe('function');
 
-      const box =
-        state.inspect.next.next.next.next.next.next.next.value.box();
+      const box = state.inspect.next.next.next.next.next.next.next.value.box();
       expect(box.value).toBe('bottom');
     });
   });
