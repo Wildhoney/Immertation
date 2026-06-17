@@ -101,19 +101,16 @@ type Inspectors<T = unknown> = BoxInspectors<T> & {
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
-type ValueAt<T, K extends PropertyKey> = T extends T
-  ? K extends keyof T
-    ? T[K]
-    : undefined
-  : never;
+type ValueAt<T, K extends PropertyKey> = T extends T ? (K extends keyof T ? T[K] : undefined) : never;
 
 export type Inspect<T, D extends number = 8> = Inspectors<T> &
   ([D] extends [0]
     ? object
     : {
-        [K in UnionKeys<T> as ValueAt<T, K> extends (...args: unknown[]) => unknown
-          ? never
-          : K]: Inspect<ValueAt<T, K>, DepthLimiter[D]>;
+        [K in UnionKeys<T> as ValueAt<T, K> extends (...args: unknown[]) => unknown ? never : K]: Inspect<
+          ValueAt<T, K>,
+          DepthLimiter[D]
+        >;
       });
 
 /** Internal keys for Annotation class properties */

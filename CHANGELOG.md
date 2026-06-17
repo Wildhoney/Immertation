@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.32](https://github.com/Wildhoney/Immertation/compare/v0.1.31...v0.1.32) (2026-06-17)
+
+
+### Bug Fixes
+
+* **types:** force ValueAt to distribute over union arms ([0e18c7b](https://github.com/Wildhoney/Immertation/commit/0e18c7ba5e0abb13736644fd6e18b7255b23747f))
+
 ## [0.1.31](https://github.com/Wildhoney/Immertation/compare/v0.1.30...v0.1.31) (2026-06-17)
 
 
