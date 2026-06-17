@@ -90,7 +90,11 @@ type Inspectors<T = unknown> = {
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
-type ValueAt<T, K extends PropertyKey> = T extends Record<K, infer V> ? V : undefined;
+type ValueAt<T, K extends PropertyKey> = T extends T
+  ? K extends keyof T
+    ? T[K]
+    : undefined
+  : never;
 
 export type Inspect<T, D extends number = 12> = Inspectors<T> &
   ([D] extends [0]
