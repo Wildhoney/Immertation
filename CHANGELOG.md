@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.31](https://github.com/Wildhoney/Immertation/compare/v0.1.30...v0.1.31) (2026-06-17)
+
+
+### Features
+
+* **types:** distribute Inspect<T> keys across union arms ([39a67fb](https://github.com/Wildhoney/Immertation/commit/39a67fb0109ebc9579809f11b80b145ad89d41fa))
+
 ## [0.1.30](https://github.com/Wildhoney/Immertation/compare/v0.1.29...v0.1.30) (2026-06-17)
 
 
