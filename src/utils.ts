@@ -2,6 +2,7 @@ import type { Patch } from 'immer';
 import {
   Annotation,
   type Box,
+  BoxBrand,
   Config,
   type Identity,
   type Inspect,
@@ -114,14 +115,15 @@ export function primitive(value: unknown): value is string | number | boolean | 
 }
 
 /**
- * Type guard that checks whether a value matches the {@link Box} shape — a
- * `{ value, inspect }` pair returned by an inspect proxy's `box()` method.
+ * Type guard that checks whether a value is a {@link Box} produced by an
+ * inspect proxy's `box()` method. Identified by a private brand symbol so
+ * arbitrary `{ value, inspect }` shapes in user data do not match.
  * @template T - The boxed value type
  * @param {unknown} value - Value to check
  * @returns {boolean} True if the value is a Box
  */
 export function isBox<T = unknown>(value: unknown): value is Box<T> {
-  return G.isObject(value) && 'value' in value && 'inspect' in value;
+  return G.isObject(value) && BoxBrand in value;
 }
 
 /**
@@ -168,7 +170,8 @@ export function inspect<M extends Model>(
       get(_, property) {
         if (property === 'pending') return () => !A.isEmpty(annotations(path));
         if (property === 'remaining') return () => A.length(annotations(path));
-        if (property === 'box') return () => ({ value: get(model(), path), inspect: proxy(path) });
+        if (property === 'box')
+          return () => ({ value: get(model(), path), inspect: proxy(path), [BoxBrand]: <const>true });
         if (property === 'is')
           return (operation: Operation) =>
             annotations(path).some((annotation) => (annotation.operation & operation) !== 0);

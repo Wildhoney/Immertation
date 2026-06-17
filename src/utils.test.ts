@@ -401,14 +401,17 @@ describe('isBox()', () => {
     ['plain object without value/inspect', { foo: 'bar' }],
     ['object with only value', { value: 1 }],
     ['object with only inspect', { inspect: {} }],
+    ['unbranded { value, inspect } shape from user data', { value: 'foo', inspect: {} }],
   ])('returns false for %s', (_, value) => {
     expect(isBox(value)).toBe(false);
   });
 
   it('narrows the type when used as a guard', () => {
-    const value: unknown = { value: 'foo', inspect: {} };
+    const state = new State<{ name: string }>();
+    state.hydrate({ name: 'foo' });
+
+    const value: unknown = state.inspect.name.box();
     if (isBox<string>(value)) {
-      // Type-only check: value.value should now be string-typed
       expect(value.value).toBe('foo');
     }
   });

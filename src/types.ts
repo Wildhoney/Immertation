@@ -97,12 +97,11 @@ type Inspectors<T = unknown> = {
  * @template T - The type of the value being inspected
  * @template D - Remaining recursion depth (defaults to 5)
  */
-export type Inspect<T, D extends number = 12> = Inspectors<T> &
-  ([D] extends [0]
-    ? object
-    : {
-        [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K], DepthLimiter[D]>;
-      });
+export type Inspect<T, D extends number = 12> = Inspectors<T> & {
+  [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: [D] extends [0]
+    ? Inspectors<T[K]>
+    : Inspect<T[K], DepthLimiter[D]>;
+};
 
 /** Internal keys for Annotation class properties */
 enum Keys {
@@ -177,5 +176,9 @@ export class Config {
 /** Type for tagged objects */
 export type Tagged = { [Config.tag]?: string };
 
+/** Brand symbol stamped onto Box objects so `isBox` can distinguish them from
+ *  arbitrary `{ value, inspect }` shapes that may occur in user data. */
+export const BoxBrand: unique symbol = Symbol('Box');
+
 /** Return type from inspect's box() method */
-export type Box<T> = { value: T; inspect: Inspect<T> };
+export type Box<T> = { value: T; inspect: Inspect<T>; readonly [BoxBrand]: true };
