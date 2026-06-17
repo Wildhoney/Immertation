@@ -8,11 +8,11 @@ export type Model = Objectish;
 /** Property key for annotation tracking */
 export type Property = undefined | null | string | number;
 
-/** Limits recursion depth for type instantiation (DepthLimiter[5]=4, DepthLimiter[4]=3, etc.) */
-type DepthLimiter = [never, 0, 1, 2, 3, 4, 5];
+/** Limits recursion depth for type instantiation (DepthLimiter[12]=11, ..., DepthLimiter[1]=0, DepthLimiter[0]=never). */
+type DepthLimiter = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /** Recursive snapshot type for identity function (limited depth to avoid infinite instantiation) */
-export type Snapshot<T, D extends number = 5> = [D] extends [0]
+export type Snapshot<T, D extends number = 12> = [D] extends [0]
   ? Extract<T, object>
   : T extends (infer U)[]
     ? T | Snapshot<U, DepthLimiter[D]>
@@ -91,11 +91,20 @@ type Inspectors<T = unknown> = {
 /**
  * Recursive proxy type for inspecting annotations at any path in the model.
  * Combines inspector methods with recursive property access.
+ * Recursion is bounded by {@link DepthLimiter} so deeply nested model shapes
+ * don't blow TypeScript's instantiation depth limit (which typescript-eslint
+ * surfaces as `error`/`any` on every reachable navigation site).
  * @template T - The type of the value being inspected
+ * @template D - Remaining recursion depth (defaults to 5)
  */
-export type Inspect<T> = Inspectors<T> & {
-  [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K]>;
-};
+export type Inspect<T, D extends number = 12> = Inspectors<T> &
+  ([D] extends [0]
+    ? object
+    : {
+        [K in keyof T as T[K] extends (...args: unknown[]) => unknown
+          ? never
+          : K]: Inspect<T[K], DepthLimiter[D]>;
+      });
 
 /** Internal keys for Annotation class properties */
 enum Keys {

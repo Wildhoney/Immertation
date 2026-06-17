@@ -617,4 +617,86 @@ describe('State', () => {
       expect(state.inspect.count.draft()).toBe(1); // Back to model value
     });
   });
+
+  describe('Inspect<T> depth limit', () => {
+    it('typechecks twelve-level-deep nested paths and reports their pending state', () => {
+      type Deep = {
+        a: {
+          b: {
+            c: {
+              d: {
+                e: {
+                  f: {
+                    g: { h: { i: { j: { k: { l: string } } } } };
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+      const state = new State<Deep>();
+      state.hydrate({
+        a: {
+          b: {
+            c: {
+              d: {
+                e: {
+                  f: {
+                    g: { h: { i: { j: { k: { l: 'leaf' } } } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(false);
+
+      state.produce(
+        (draft) =>
+          void (draft.a.b.c.d.e.f.g.h.i.j.k.l = state.annotate(
+            Op.Update,
+            'pending-leaf',
+          )),
+      );
+
+      expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(true);
+    });
+
+    it('exposes Inspectors at every depth without recursing infinitely', () => {
+      type Recursive = {
+        next: {
+          next: {
+            next: {
+              next: { next: { next: { next: { value: string } } } };
+            };
+          };
+        };
+      };
+      const state = new State<Recursive>();
+      state.hydrate({
+        next: {
+          next: {
+            next: {
+              next: { next: { next: { next: { value: 'bottom' } } } },
+            },
+          },
+        },
+      });
+
+      expect(typeof state.inspect.next.pending).toBe('function');
+      expect(
+        typeof state.inspect.next.next.next.next.next.next.next.pending,
+      ).toBe('function');
+      expect(
+        typeof state.inspect.next.next.next.next.next.next.next.value.pending,
+      ).toBe('function');
+
+      const box =
+        state.inspect.next.next.next.next.next.next.next.value.box();
+      expect(box.value).toBe('bottom');
+    });
+  });
 });
