@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.27](https://github.com/Wildhoney/Immertation/compare/v0.1.26...v0.1.27) (2026-06-17)
+
+
+### Features
+
+* export isBox type guard for Box shape detection ([1991386](https://github.com/Wildhoney/Immertation/commit/1991386ce4f0c345a9a7744370189716c90bad13))
+
 ## [0.1.26](https://github.com/Wildhoney/Immertation/compare/v0.1.25...v0.1.26) (2026-02-11)
 
 
