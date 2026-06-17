@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.30](https://github.com/Wildhoney/Immertation/compare/v0.1.29...v0.1.30) (2026-06-17)
+
+
+### Bug Fixes
+
+* **types:** re-bound Inspect depth to prevent any-degradation on deep paths ([7d05d58](https://github.com/Wildhoney/Immertation/commit/7d05d58d2c5ceb0dca3c956a8f43cd10a121ee9e))
+
 ## [0.1.29](https://github.com/Wildhoney/Immertation/compare/v0.1.27...v0.1.29) (2026-06-17)
 
 
