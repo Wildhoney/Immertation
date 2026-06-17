@@ -8,11 +8,11 @@ export type Model = Objectish;
 /** Property key for annotation tracking */
 export type Property = undefined | null | string | number;
 
-/** Limits recursion depth for type instantiation (DepthLimiter[12]=11, ..., DepthLimiter[1]=0, DepthLimiter[0]=never). */
-type DepthLimiter = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+/** Limits recursion depth for type instantiation (DepthLimiter[8]=7, ..., DepthLimiter[1]=0, DepthLimiter[0]=never). */
+type DepthLimiter = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 /** Recursive snapshot type for identity function (limited depth to avoid infinite instantiation) */
-export type Snapshot<T, D extends number = 12> = [D] extends [0]
+export type Snapshot<T, D extends number = 8> = [D] extends [0]
   ? Extract<T, object>
   : T extends (infer U)[]
     ? T | Snapshot<U, DepthLimiter[D]>
@@ -70,10 +70,14 @@ export type Id = string;
 export type Path = (string | number)[];
 
 /**
- * Methods available on the inspect proxy for checking annotation status.
+ * Annotation-checking methods on the inspect proxy. Carved out from
+ * {@link Inspectors} so `Box<T>` can reference these without dragging in
+ * `box(): Box<T>` &mdash; that direct mutual recursion `Box ↔ Inspectors`
+ * blows out TS recursion budgets under typescript-eslint's type-aware
+ * mode.
  * @template T - The type of the value being inspected
  */
-type Inspectors<T = unknown> = {
+export type BoxInspectors<T = unknown> = {
   /** Returns true if any pending annotations exist */
   pending(): boolean;
   /** Returns the count of pending annotations at this path */
@@ -84,6 +88,13 @@ type Inspectors<T = unknown> = {
   draft(): T;
   /** Returns a promise that resolves with the value when no more annotations exist at this path */
   settled(): Promise<T>;
+};
+
+/**
+ * Methods available on the inspect proxy for checking annotation status.
+ * @template T - The type of the value being inspected
+ */
+type Inspectors<T = unknown> = BoxInspectors<T> & {
   /** Returns the current model value and an inspect proxy for this path */
   box(): Box<T>;
 };
@@ -96,7 +107,7 @@ type ValueAt<T, K extends PropertyKey> = T extends T
     : undefined
   : never;
 
-export type Inspect<T, D extends number = 12> = Inspectors<T> &
+export type Inspect<T, D extends number = 8> = Inspectors<T> &
   ([D] extends [0]
     ? object
     : {
@@ -182,5 +193,9 @@ export type Tagged = { [Config.tag]?: string };
  *  arbitrary `{ value, inspect }` shapes that may occur in user data. */
 export const BoxBrand: unique symbol = Symbol('Box');
 
-/** Return type from inspect's box() method */
-export type Box<T> = { value: T; inspect: Inspect<T>; readonly [BoxBrand]: true };
+/** Return type from inspect's box() method. `inspect` is
+ *  {@link BoxInspectors} (annotation methods only, no nested `box()`),
+ *  which severs the mutual recursion `Box ↔ Inspectors` so
+ *  typescript-eslint's type-aware mode can resolve `Box<T>` without
+ *  hitting its recursion budget. */
+export type Box<T> = { value: T; inspect: BoxInspectors<T>; readonly [BoxBrand]: true };
