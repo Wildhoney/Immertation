@@ -94,14 +94,17 @@ type Inspectors<T = unknown> = {
  * Recursion is bounded by {@link DepthLimiter} so deeply nested model shapes
  * don't blow TypeScript's instantiation depth limit (which typescript-eslint
  * surfaces as `error`/`any` on every reachable navigation site).
+ * The depth check wraps the mapped type so typescript-eslint's resolver can
+ * short-circuit at depth 0 rather than enumerating keys at every level.
  * @template T - The type of the value being inspected
- * @template D - Remaining recursion depth (defaults to 5)
+ * @template D - Remaining recursion depth (defaults to 12)
  */
-export type Inspect<T, D extends number = 12> = Inspectors<T> & {
-  [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: [D] extends [0]
-    ? Inspectors<T[K]>
-    : Inspect<T[K], DepthLimiter[D]>;
-};
+export type Inspect<T, D extends number = 12> = Inspectors<T> &
+  ([D] extends [0]
+    ? object
+    : {
+        [K in keyof T as T[K] extends (...args: unknown[]) => unknown ? never : K]: Inspect<T[K], DepthLimiter[D]>;
+      });
 
 /** Internal keys for Annotation class properties */
 enum Keys {

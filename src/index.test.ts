@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { Op, State } from '.';
+import type { Inspect } from './types';
 import { describe, expect, it, vi } from 'vitest';
 
 /**
@@ -615,6 +616,37 @@ describe('State', () => {
       processes.forEach((p) => state.prune(p));
       expect(state.inspect.count.remaining()).toBe(0);
       expect(state.inspect.count.draft()).toBe(1); // Back to model value
+    });
+  });
+
+  describe('Inspect<T> Hive-style deep path access', () => {
+    it('resolves leaf inspector methods without typescript-eslint any-degradation', () => {
+      type AccountSummary = {
+        id: string;
+        accountName: string;
+        businessAccountTier: 'starter' | 'pro';
+      };
+      type Envs = {
+        portal: symbol;
+        client: { baseUrl: string };
+        account: AccountSummary;
+      };
+
+      const state = new State<Envs>();
+      state.hydrate({
+        portal: Symbol('Web'),
+        client: { baseUrl: 'https://api.test' },
+        account: {
+          id: 'acc_1',
+          accountName: 'Kilback Inc',
+          businessAccountTier: 'starter',
+        },
+      });
+
+      const inspect: Inspect<Envs> = state.inspect;
+      const box = inspect.account.accountName.box();
+      expect(box.value).toBe('Kilback Inc');
+      expect(typeof inspect.account.accountName.pending).toBe('function');
     });
   });
 
