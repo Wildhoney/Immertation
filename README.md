@@ -1,26 +1,14 @@
-<p align="center">
-  <img src="media/logo.png" alt="Immertation" width="33%" />
-</p>
+<div align="center">
+  <img src="/media/logo.png" width="475" alt="Immertation" />
 
-<p align="center">
-  <a href="https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml">
-    <img src="https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml/badge.svg" alt="Checks">
-  </a>
-</p>
+[![Checks](https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml/badge.svg)](https://github.com/Wildhoney/Immertation/actions/workflows/checks.yml)
+[![Deploy](https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml/badge.svg)](https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml)
 
-<p align="center">
-  <a href="https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml">
-    <img src="https://github.com/Wildhoney/Immertation/actions/workflows/deploy.yml/badge.svg" alt="Checks">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://wildhoney.github.io/Immertation">View Live Demo</a>
-  &nbsp;·&nbsp;
-  <a href="https://wildhoney.github.io/Immertation/docs/">API Docs</a>
-</p>
+</div>
 
 > State management library that tracks changes to your data using Immer patches and provides a powerful annotation system for operation tracking.
+
+> **[View Live Demo →](https://wildhoney.github.io/Immertation)** &nbsp;·&nbsp; **[API Docs →](https://wildhoney.github.io/Immertation/docs/)**
 
 Operations are particularly useful for async operations and optimistic updates, where the model is being operated on but not yet committed to the final value. This allows you to track pending changes and distinguish between the current committed state and the draft state with pending operations.
 
@@ -32,7 +20,7 @@ Operations are particularly useful for async operations and optimistic updates, 
   - [Inspecting state](#inspecting-state)
   - [Pruning annotations](#pruning-annotations)
   - [Observing changes](#observing-changes)
-  - [Identity function](#custom-identity-function)
+  - [Identity function](#identity-function)
 
 ## Getting started
 
