@@ -113,6 +113,26 @@ export type Inspect<T, D extends number = 8> = Inspectors<T> &
         >;
       });
 
+/**
+ * Nested variant of {@link BoxInspectors}: exposes the annotation methods at
+ * every path beneath a boxed value, mirroring {@link Inspect} but *without*
+ * the `box(): Box<T>` branch. Recurses on itself &mdash; never on `Box<T>`
+ * &mdash; so it drills into nested paths without recreating the mutual
+ * recursion `Box ↔ Inspectors` that the {@link BoxInspectors} carve-out
+ * exists to sever.
+ * @template T - The type of the value being inspected
+ * @template D - Remaining recursion budget
+ */
+export type BoxInspect<T, D extends number = 8> = BoxInspectors<T> &
+  ([D] extends [0]
+    ? object
+    : {
+        [K in UnionKeys<T> as ValueAt<T, K> extends (...args: unknown[]) => unknown ? never : K]: BoxInspect<
+          ValueAt<T, K>,
+          DepthLimiter[D]
+        >;
+      });
+
 /** Internal keys for Annotation class properties */
 enum Keys {
   Property = 'property',
@@ -191,8 +211,9 @@ export type Tagged = { [Config.tag]?: string };
 export const BoxBrand: unique symbol = Symbol('Box');
 
 /** Return type from inspect's box() method. `inspect` is
- *  {@link BoxInspectors} (annotation methods only, no nested `box()`),
- *  which severs the mutual recursion `Box ↔ Inspectors` so
- *  typescript-eslint's type-aware mode can resolve `Box<T>` without
- *  hitting its recursion budget. */
-export type Box<T> = { value: T; inspect: BoxInspectors<T>; readonly [BoxBrand]: true };
+ *  {@link BoxInspect} &mdash; the annotation methods at this path plus
+ *  nested-key traversal into the boxed value, but no nested `box()`. Because
+ *  {@link BoxInspect} recurses on itself rather than back through `Box<T>`,
+ *  it severs the mutual recursion `Box ↔ Inspectors` so typescript-eslint's
+ *  type-aware mode can resolve `Box<T>` without hitting its recursion budget. */
+export type Box<T> = { value: T; inspect: BoxInspect<T>; readonly [BoxBrand]: true };

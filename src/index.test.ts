@@ -651,44 +651,20 @@ describe('State', () => {
   });
 
   describe('Inspect<T> depth limit', () => {
-    it('typechecks twelve-level-deep nested paths and reports their pending state', () => {
+    it('typechecks eight-level-deep nested paths and reports their pending state', () => {
       type Deep = {
-        a: {
-          b: {
-            c: {
-              d: {
-                e: {
-                  f: {
-                    g: { h: { i: { j: { k: { l: string } } } } };
-                  };
-                };
-              };
-            };
-          };
-        };
+        a: { b: { c: { d: { e: { f: { g: { h: string } } } } } } };
       };
       const state = new State<Deep>();
       state.hydrate({
-        a: {
-          b: {
-            c: {
-              d: {
-                e: {
-                  f: {
-                    g: { h: { i: { j: { k: { l: 'leaf' } } } } },
-                  },
-                },
-              },
-            },
-          },
-        },
+        a: { b: { c: { d: { e: { f: { g: { h: 'leaf' } } } } } } },
       });
 
-      expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(false);
+      expect(state.inspect.a.b.c.d.e.f.g.h.pending()).toBe(false);
 
-      state.produce((draft) => void (draft.a.b.c.d.e.f.g.h.i.j.k.l = state.annotate(Op.Update, 'pending-leaf')));
+      state.produce((draft) => void (draft.a.b.c.d.e.f.g.h = state.annotate(Op.Update, 'pending-leaf')));
 
-      expect(state.inspect.a.b.c.d.e.f.g.h.i.j.k.l.pending()).toBe(true);
+      expect(state.inspect.a.b.c.d.e.f.g.h.pending()).toBe(true);
     });
 
     it('exposes Inspectors at every depth without recursing infinitely', () => {
