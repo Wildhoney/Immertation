@@ -15,6 +15,7 @@ Operations are particularly useful for async operations and optimistic updates, 
 ## Contents
 
 - [Getting started](#getting-started)
+  - [Hydrating state](#hydrating-state)
   - [Using annotations](#using-annotations)
   - [Available operations](#available-operations)
   - [Inspecting state](#inspecting-state)
@@ -46,6 +47,37 @@ console.log(state.model.age); // 31
 console.log(state.inspect.name.pending()); // false
 console.log(state.inspect.age.pending()); // false
 ```
+
+### Hydrating state
+
+`hydrate()` seeds the state with its initial model. It's a required first step: it establishes the committed model that patches are later applied against, and it unlocks `produce()` &mdash; calling `produce()` on an un-hydrated state throws, because there is no base state to mutate.
+
+```typescript
+const state = new State<Model>();
+
+state.hydrate({ name: 'Imogen', age: 30 });
+state.produce((draft) => void (draft.age = 31)); // OK
+
+// Calling produce() first would throw:
+// "State must be hydrated using hydrate() before calling produce()"
+```
+
+The difference between `hydrate()` and `produce()` shows up when the incoming model contains annotations. `produce()` preserves the current committed value and records the annotated value as a _pending draft_ (see [Using annotations](#using-annotations)). `hydrate()` does the opposite: the annotated value becomes the **actual** committed value, while still being registered as a pending operation.
+
+```typescript
+const state = new State<Model>();
+
+// The annotated value becomes the committed model value...
+const process = state.hydrate({ name: state.annotate(Op.Update, 'Phoebe'), age: 30 });
+
+console.log(state.model.name); // 'Phoebe'
+
+// ...yet it is still tracked as a pending operation
+console.log(state.inspect.name.pending()); // true
+console.log(state.inspect.name.is(Op.Update)); // true
+```
+
+This makes `hydrate()` the natural entry point for rehydrating data that already carries in-flight operations &mdash; for example server-rendered or persisted state whose optimistic updates haven't settled yet. Like `produce()`, `hydrate()` returns a `Process` symbol you can later [prune](#pruning-annotations) once those operations resolve.
 
 ### Using annotations
 
