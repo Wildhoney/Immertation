@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.33](https://github.com/Wildhoney/Immertation/compare/v0.1.32...v0.1.33) (2026-10-23)
+
+
+### Bug Fixes
+
+* bump ajv, brace-expansion, joi and yaml to patch advisories ([e52740f](https://github.com/Wildhoney/Immertation/commit/e52740f35f552c9f8335277aa45ad07c50191660))
+* **deps:** patch nanoid, postcss, js-yaml security advisories ([f9cdc1d](https://github.com/Wildhoney/Immertation/commit/f9cdc1d5d10d6c6679045a063d984aa535a1cd9e))
+* resolve open Dependabot security alerts ([2b89870](https://github.com/Wildhoney/Immertation/commit/2b898701759dcd03f58d1c7671dff5c85b67b09b))
+* **types:** restore Box.inspect nested traversal, align deep-path test with depth bound ([1e74da2](https://github.com/Wildhoney/Immertation/commit/1e74da2d3226cc7e990a854380806f3163f94393))
+
 ## [0.1.32](https://github.com/Wildhoney/Immertation/compare/v0.1.31...v0.1.32) (2026-06-17)
 
 
